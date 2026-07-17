@@ -1,0 +1,10 @@
+# Segredos — NUNCA versionar (contêm chaves e senhas)
+.env
+.env.local
+.env.bak
+*.key
+
+# Node / build
+node_modules/
+dist/
+*.log
