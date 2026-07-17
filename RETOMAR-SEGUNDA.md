@@ -48,6 +48,40 @@ Não precisa reiniciar o banco: **o Supabase é nuvem, está sempre no ar.**
 
 ---
 
+## ⚠ Achados da revisão técnica (corrigir ANTES de produção)
+
+Revisão automatizada do commit inicial encontrou brechas — a maioria no isolamento
+multi-instituto (o core do produto). Nenhuma bloqueia o desenvolvimento local, mas
+todas precisam ser resolvidas antes de dado real. Prioridade alta em negrito.
+
+**🔴 Críticos**
+1. **RLS `perfil_mod` permite escalada:** um `admin_instituto` pode fazer `UPDATE` de
+   um perfil para `papel='admin'` (super-admin) e furar o isolamento. Corrigir o
+   `WITH CHECK` (proibir gravar `papel='admin'` salvo se já for super-admin).
+2. **INSERT não valida tenant das FKs:** totem pode gravar `resposta.unidade_id`/
+   `modelo_id` de OUTRO instituto (só checa `instituto_id` da própria linha). Precisa
+   trigger `BEFORE INSERT` ou FK composta `(instituto_id, id)`.
+3. **Totem não é preso à própria unidade:** pode gravar em qualquer unidade do
+   instituto. RLS deve exigir `unidade_id = (perfil do totem)`.
+4. **Credenciais do totem vão no bundle** (`VITE_*` inlined). Endurecer a RLS (1–3)
+   primeiro; considerar RPC `security definer` chamada por `anon` (já previsto em 02_rls.sql).
+5. **Envio não idempotente → duplica métricas:** `enviar()` faz 2 inserts; falha de
+   rede reenfileira e duplica a resposta. Mover para RPC transacional com id gerado
+   no cliente + `on conflict do nothing`.
+
+**🟡 Avisos** — corrida na fila offline (sem lock); `carregarConfig` ignora `ativo`/escopo
+do modelo; `valor_num` sem CHECK de faixa (0–10 / 1–5) no banco; `resposta_item.tipo`
+não validado contra `pergunta.tipo`; pergunta de texto `obrigatoria` não é exigida na UI.
+
+**💡 Sugestões** — `app/.env.example` dedicado; usar `dotenv` nos scripts; `vw_comentarios`
+expor `pergunta_id`; simplificar destructuring em `migrar.mjs:146`.
+
+**Sólido:** RLS ativa em todas as tabelas; `SECURITY DEFINER` com `search_path` fixo
+(sem hijacking); views com `security_invoker`; migração com proteção anti-duplicação.
+
+> Sugestão de ordem segunda: **dashboard** (não depende dos fixes) e, em paralelo,
+> fechar os críticos 1–3 (RLS) que são rápidos e protegem o isolamento.
+
 ## Credenciais e acessos
 
 - **Supabase:** projeto `kogyifdphdgbmubxzztd` — painel em supabase.com (sua conta).
