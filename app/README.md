@@ -11,21 +11,35 @@ npm install          # só na primeira vez
 npm run dev          # abre em http://localhost:5173
 ```
 
-Config em `app/.env` (ignorado pelo git) — ver `../.env.example` para as chaves:
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_TOTEM_EMAIL`, `VITE_TOTEM_PASSWORD`.
+Config em `app/.env` (ignorado pelo git) — só `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+**Não há credencial de totem no `.env`** — ver "Pareamento" abaixo.
 
 ## Como funciona
 
-- **Login do totem** (`lib/isv.js` → `entrarComoTotem`): o app autentica como o usuário
-  `totem@…` (papel `totem`), criado por `../scripts/criar-totem.mjs`. A sessão persiste.
+- **Sessão + pareamento** (`lib/isv.js` → `sessaoAtiva`/`estaPareado`/`parear`): o app entra
+  ANÔNIMO (`supabase.auth.signInAnonymously`) — sem nenhuma credencial no bundle. Um aparelho
+  anônimo ainda não tem `usuario_perfil`, então não grava nada. Na primeira vez, a tela pede um
+  código de 8 letras que o TI gera com `../scripts/gerar-codigo-totem.mjs` e digita, uma vez,
+  direto no aparelho. A RPC `parear_totem` (`../db/10_pareamento_totem.sql`) valida o código e
+  vincula esse dispositivo — só ele — a um perfil `papel='totem'` da unidade certa. Depois disso
+  a sessão persiste no `localStorage` do aparelho; o pareamento não se repete.
 - **Config** (`carregarConfig`): lê instituto, unidade, modelo e perguntas via RLS.
 - **Coleta** (`App.jsx`): uma pergunta por tela, renderizada pelo `tipo`
   (`nps` 0–10, `estrela`, `carinha`, `texto`). Botões grandes, tema claro fixo.
-- **Envio** (`enviar`): grava `resposta` + `resposta_item`. Se estiver offline ou falhar,
-  enfileira em `localStorage` e reenvia quando a conexão volta (`tentarEnviarFila`).
+- **Envio** (`enviar`): chama a RPC `registrar_resposta` (`../db/08`/`09`) — resposta + itens
+  numa transação, id gerado no cliente (idempotente). Se estiver offline ou falhar, enfileira em
+  `localStorage` e reenvia quando a conexão volta (`tentarEnviarFila`).
+
+## Pareamento de um tablet novo
+
+```bash
+node ../scripts/gerar-codigo-totem.mjs "Nome da Unidade"
+```
+
+Digite o código de 8 letras na tela do tablet — expira em 30 min e só funciona uma vez.
+Exige o toggle "Allow anonymous sign-ins" ativado no Supabase (Authentication → Sign In / Providers).
 
 ## Pendências
 
-- [ ] Rodar `../db/06_rls_totem.sql` (impede o totem de LER respostas alheias).
 - [ ] Service Worker / PWA (instalável, cache offline).
-- [ ] Tela de configuração da unidade (hoje fixa via usuário totem).
+- [ ] Tela de configuração da unidade (hoje fixa via `usuario_perfil`).

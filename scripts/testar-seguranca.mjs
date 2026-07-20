@@ -29,20 +29,37 @@ console.log('\n==============================================');
 console.log(' TESTE DE SEGURANÇA — pós 07_rls_correcoes.sql');
 console.log('==============================================\n');
 
-// ---- login do totem (como o app faz) ----
-const tk = await fetch(`${URL}/auth/v1/token?grant_type=password`, {
-  method: 'POST', headers: { apikey: app.VITE_SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email: app.VITE_TOTEM_EMAIL, password: app.VITE_TOTEM_PASSWORD }),
-}).then((r) => r.json());
-if (!tk.access_token) { console.error('login do totem falhou:', tk); process.exit(1); }
-const TOT = { apikey: app.VITE_SUPABASE_ANON_KEY, Authorization: `Bearer ${tk.access_token}`, 'Content-Type': 'application/json' };
-const totPost = (p, b) => fetch(`${URL}/rest/v1/${p}`, { method: 'POST', headers: { ...TOT, Prefer: 'return=representation' }, body: JSON.stringify(b) });
-
 // ---- contexto ----
 const [isv] = await srvGet('instituto?slug=eq.isv&select=id');
-const [perfil] = await srvGet(`usuario_perfil?papel=eq.totem&select=unidade_id,instituto_id`);
+const [minhaUnidadeRow] = await srvGet(`unidade?instituto_id=eq.${isv.id}&select=id,nome&order=nome.asc&limit=1`);
 const [modelo] = await srvGet(`modelo_pesquisa?instituto_id=eq.${isv.id}&select=id&limit=1`);
-const minhaUnidade = perfil.unidade_id;
+const minhaUnidade = minhaUnidadeRow.id;
+
+// ---- pareia um totem de teste: MESMO fluxo do app (anônimo + código de uso único) ----
+const codigoTeste = crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
+await srvPost('totem_pareamento', [{
+  instituto_id: isv.id, unidade_id: minhaUnidade, codigo: codigoTeste,
+  expira_em: new Date(Date.now() + 5 * 60_000).toISOString(),
+}]);
+
+const anon = await fetch(`${URL}/auth/v1/signup`, {
+  method: 'POST', headers: { apikey: app.VITE_SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ data: {} }),
+}).then((r) => r.json());
+if (!anon.access_token) {
+  console.error('\nSessão anônima falhou:', JSON.stringify(anon));
+  console.error('Verifique: Supabase → Authentication → Sign In / Providers → "Allow anonymous sign-ins".');
+  process.exit(1);
+}
+const totemUserId = anon.user.id;
+const TOT = { apikey: app.VITE_SUPABASE_ANON_KEY, Authorization: `Bearer ${anon.access_token}`, 'Content-Type': 'application/json' };
+
+const parRes = await fetch(`${URL}/rest/v1/rpc/parear_totem`, {
+  method: 'POST', headers: TOT, body: JSON.stringify({ p_codigo: codigoTeste }),
+});
+if (!parRes.ok) { console.error('pareamento de teste falhou:', await parRes.text()); process.exit(1); }
+
+const totPost = (p, b) => fetch(`${URL}/rest/v1/${p}`, { method: 'POST', headers: { ...TOT, Prefer: 'return=representation' }, body: JSON.stringify(b) });
 
 // ---- monta um instituto vizinho temporário ----
 const [vz] = await srvPost('instituto', [{ nome: 'ZZ Teste Vizinho', slug: 'zz-teste-vizinho' }]);
@@ -117,6 +134,8 @@ if (gravou) {   // só faz sentido se a RPC comprovadamente grava
 await srvDel(`resposta?id=eq.${respTeste}`);
 await srvDel(`unidade?id=eq.${outraUni.id}`);
 await srvDel(`instituto?id=eq.${vz.id}`);   // cascata leva município e unidade
+// usuário anônimo de teste (leva o usuario_perfil junto, on delete cascade)
+await fetch(`${URL}/auth/v1/admin/users/${totemUserId}`, { method: 'DELETE', headers: SRV });
 
 console.log('\n----------------------------------------------');
 console.log(` ${ok} passaram · ${fail} falharam`);

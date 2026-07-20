@@ -1,4 +1,13 @@
-/* Cria (ou reaproveita) o usuário 'totem' do ISV e o vincula a uma unidade.
+/* OBSOLETO — mantido só como histórico. NÃO use para provisionar tablets.
+   Este script cria uma senha ÚNICA COMPARTILHADA por todos os totens e o
+   app antigo a embutia no bundle Vite (VITE_TOTEM_EMAIL/PASSWORD) — texto
+   plano, visível em devtools em produção. Isso foi o 🔴 4 do revisor.
+   Use scripts/gerar-codigo-totem.mjs (pareamento por código de uso único,
+   ver db/10_pareamento_totem.sql) e depois rode
+   scripts/revogar-totem-antigo.mjs para apagar a conta que este arquivo
+   criava.
+
+   Cria (ou reaproveita) o usuário 'totem' do ISV e o vincula a uma unidade.
    O tablet faz login com essas credenciais para gravar respostas.
    Papel 'totem' só INSERE respostas (não lê) — ver 06_rls_totem.sql.
    Uso: node produto-isv/scripts/criar-totem.mjs [nome-da-unidade] */

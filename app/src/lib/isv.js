@@ -1,15 +1,36 @@
 import { supabase } from './supabase';
 
-// -------- Autenticação do totem (uma vez; sessão persiste) --------
-export async function entrarComoTotem() {
-  const { data: s } = await supabase.auth.getSession();
-  if (s?.session) return s.session;
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: import.meta.env.VITE_TOTEM_EMAIL,
-    password: import.meta.env.VITE_TOTEM_PASSWORD,
-  });
-  if (error) throw new Error('Falha no login do totem: ' + error.message);
-  return data.session;
+/* -------- Sessão + pareamento do totem --------
+   Nenhuma credencial vive no bundle. O aparelho entra ANÔNIMO (sem
+   usuario_perfil, não passa em nenhuma política de escrita) e só vira
+   'totem' de verdade depois que alguém digita, uma vez, um código de
+   uso único gerado pelo TI (scripts/gerar-codigo-totem.mjs). Depois
+   disso a sessão persiste no localStorage do próprio aparelho.
+   Ver db/10_pareamento_totem.sql para o porquê. */
+
+export async function sessaoAtiva() {
+  const { data } = await supabase.auth.getSession();
+  if (data.session) return data.session;
+  const { data: anon, error } = await supabase.auth.signInAnonymously();
+  if (error) throw new Error('Falha ao iniciar sessão do totem: ' + error.message);
+  return anon.session;
+}
+
+// Existe usuario_perfil para esta sessão? Se não, o aparelho ainda não pareou.
+export async function estaPareado() {
+  const { error } = await supabase.from('usuario_perfil').select('id').single();
+  return !error;
+}
+
+export async function parear(codigo) {
+  const { data, error } = await supabase.rpc('parear_totem', { p_codigo: codigo });
+  if (error) throw new Error(traduzErroPareamento(error.message));
+  return data; // { instituto, unidade }
+}
+
+function traduzErroPareamento(msg) {
+  if (msg?.includes('invalido ou expirado')) return 'Código inválido ou expirado. Peça um código novo.';
+  return 'Não foi possível parear este totem: ' + msg;
 }
 
 // -------- Carrega o instituto/unidade/modelo/perguntas via RLS --------

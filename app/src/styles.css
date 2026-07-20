@@ -83,6 +83,13 @@ button{ font-family:inherit; cursor:pointer; }
 .btn.ghost{ background:transparent; color:var(--ink-2); border:1.5px solid var(--line-2); }
 .btn.ghost:hover{ background:var(--sunken); }
 
+/* pareamento (uma vez por aparelho) */
+.pareamento{ display:flex; flex-direction:column; align-items:center; gap:18px; max-width:420px; }
+.pareamento-codigo{ width:100%; text-align:center; letter-spacing:.35em; text-transform:uppercase;
+  font-family:var(--font-dp); font-size:1.6rem; font-weight:700; padding:16px 12px;
+  border:1.5px solid var(--line-2); border-radius:12px; color:var(--ink); background:var(--surface); }
+.pareamento-codigo:focus{ outline:3px solid rgba(11,110,99,.25); border-color:var(--accent); }
+
 /* estados */
 .spinner{ width:44px; height:44px; border-radius:50%; border:4px solid var(--line);
   border-top-color:var(--accent); animation:girar .8s linear infinite; }

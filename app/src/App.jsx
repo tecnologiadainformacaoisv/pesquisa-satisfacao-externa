@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  entrarComoTotem, carregarConfig, enviar,
+  sessaoAtiva, estaPareado, parear, carregarConfig, enviar,
   enfileirar, tentarEnviarFila, pendentes,
 } from './lib/isv';
 
@@ -15,7 +15,7 @@ const CARINHAS = [
 ];
 
 export default function App() {
-  const [fase, setFase] = useState('carregando'); // carregando|erro|form|enviando|obrigado
+  const [fase, setFase] = useState('carregando'); // carregando|parear|erro|form|enviando|obrigado
   const [erro, setErro] = useState('');
   const [cfg, setCfg] = useState(null);
   const [passo, setPasso] = useState(0);
@@ -23,23 +23,31 @@ export default function App() {
   const [salvoOffline, setSalvoOffline] = useState(false);
   const [fila, setFila] = useState(0);
 
+  async function iniciar() {
+    try {
+      await sessaoAtiva();
+      if (!(await estaPareado())) { setFase('parear'); return; }
+      const c = await carregarConfig();
+      setCfg(c);
+      setFase('form');
+      tentarEnviarFila().then(() => setFila(pendentes())).catch(() => {});
+    } catch (e) {
+      setErro(e.message || String(e));
+      setFase('erro');
+    }
+  }
+
   useEffect(() => {
-    (async () => {
-      try {
-        await entrarComoTotem();
-        const c = await carregarConfig();
-        setCfg(c);
-        setFase('form');
-        tentarEnviarFila().then(() => setFila(pendentes())).catch(() => {});
-      } catch (e) {
-        setErro(e.message || String(e));
-        setFase('erro');
-      }
-    })();
+    iniciar();
     const onNet = () => tentarEnviarFila().then(() => setFila(pendentes())).catch(() => {});
     window.addEventListener('online', onNet);
     return () => window.removeEventListener('online', onNet);
   }, []);
+
+  async function confirmarPareamento(codigo) {
+    await parear(codigo);       // lança com mensagem amigável em caso de erro
+    await iniciar();            // recarrega config já como 'totem'
+  }
 
   const perguntas = cfg?.perguntas || [];
   const p = perguntas[passo];
@@ -93,6 +101,8 @@ export default function App() {
 
   // ---------- Telas de estado ----------
   if (fase === 'carregando') return <Centro><div className="spinner" /><p>Carregando…</p></Centro>;
+
+  if (fase === 'parear') return <TelaPareamento onConfirmar={confirmarPareamento} />;
 
   if (fase === 'erro') return (
     <Centro>
@@ -199,6 +209,49 @@ export default function App() {
 
 // ---------- auxiliares ----------
 function Centro({ children }) { return <div className="tela centro">{children}</div>; }
+
+function TelaPareamento({ onConfirmar }) {
+  const [codigo, setCodigo] = useState('');
+  const [erro, setErro] = useState('');
+  const [indo, setIndo] = useState(false);
+
+  async function enviar(e) {
+    e.preventDefault();
+    setIndo(true); setErro('');
+    try {
+      await onConfirmar(codigo.trim());
+    } catch (err) {
+      setErro(err.message || String(err));
+      setIndo(false);
+    }
+  }
+
+  return (
+    <Centro>
+      <form className="pareamento" onSubmit={enviar}>
+        <h1 className="ask-q">Parear este totem</h1>
+        <p className="ask-s">
+          Digite o código de 8 letras que o TI gerou para esta unidade.
+          Isso só precisa ser feito uma vez neste aparelho.
+        </p>
+        <input
+          className="pareamento-codigo"
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+          placeholder="XXXXXXXX"
+          maxLength={8}
+          autoFocus
+          autoCapitalize="characters"
+          autoComplete="off"
+        />
+        {erro && <p className="erro">{erro}</p>}
+        <button className="btn" disabled={indo || codigo.trim().length < 4}>
+          {indo ? 'Pareando…' : 'Confirmar'}
+        </button>
+      </form>
+    </Centro>
+  );
+}
 
 function legenda(tipo) {
   if (tipo === 'nps') return 'Toque em uma nota de 0 a 10.';
