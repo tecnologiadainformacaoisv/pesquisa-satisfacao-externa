@@ -102,14 +102,31 @@ create trigger trg_item_tenant before insert or update on resposta_item
 
 -- -------------------------------------------------------------
 --  🔴 3 · Totem só grava na PRÓPRIA unidade
+--
+--  A unidade vem de uma função SECURITY DEFINER, igual a current_papel()
+--  e current_instituto_id() — mantém o padrão e evita depender da RLS de
+--  usuario_perfil dentro da avaliação da política.
+--
+--  ATENÇÃO ao depurar esta política: gravar com PostgREST usando
+--  "Prefer: return=representation" (ou .select() no supabase-js) faz o
+--  INSERT devolver a linha, e devolvê-la passa pela política de SELECT
+--  logo abaixo — que barra o totem de propósito. O Postgres reporta isso
+--  com a MESMA mensagem de violação de INSERT, o que engana. Por isso a
+--  coleta grava pela RPC do 08, que não devolve linha nenhuma.
 -- -------------------------------------------------------------
+create or replace function current_unidade_id()
+returns uuid language sql stable security definer
+set search_path = public as $$
+  select unidade_id from usuario_perfil where id = auth.uid();
+$$;
+
 drop policy if exists resposta_ins on resposta;
 create policy resposta_ins on resposta for insert with check (
   instituto_id = current_instituto_id()
   and current_papel() in ('totem','admin_instituto','admin_municipio','admin_unidade')
   and (
     current_papel() <> 'totem'
-    or unidade_id = (select unidade_id from usuario_perfil where id = auth.uid())
+    or unidade_id = current_unidade_id()
   )
 );
 

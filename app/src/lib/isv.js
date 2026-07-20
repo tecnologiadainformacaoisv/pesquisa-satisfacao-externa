@@ -37,29 +37,27 @@ export async function carregarConfig() {
 }
 
 // -------- Gravação de uma resposta (+ itens) --------
+/* Vai tudo numa RPC (db/08): uma transação só, e o id é gerado AQUI.
+   Isso torna o reenvio da fila offline idempotente — mandar duas vezes
+   a mesma resposta não duplica métrica — e dispensa ler a linha de volta,
+   coisa que o totem não pode fazer. */
 export async function enviar(payload) {
-  const { data: resp, error } = await supabase
-    .from('resposta')
-    .insert({
-      instituto_id: payload.instituto_id,
-      unidade_id: payload.unidade_id,
-      modelo_id: payload.modelo_id,
-      origem: 'totem',
-    })
-    .select('id').single();
-  if (error) throw error;
+  const id = payload.id || crypto.randomUUID();
 
-  const linhas = payload.itens.map((it) => ({
-    instituto_id: payload.instituto_id,
-    resposta_id: resp.id,
-    pergunta_id: it.pergunta_id,
-    tipo: it.tipo,
-    valor_num: it.valor_num ?? null,
-    valor_texto: it.valor_texto ?? null,
-  }));
-  const { error: e2 } = await supabase.from('resposta_item').insert(linhas);
-  if (e2) throw e2;
-  return resp.id;
+  const { error } = await supabase.rpc('registrar_resposta', {
+    p_id: id,
+    p_unidade: payload.unidade_id,
+    p_modelo: payload.modelo_id,
+    p_origem: 'totem',
+    p_itens: payload.itens.map((it) => ({
+      pergunta_id: it.pergunta_id ?? null,
+      tipo: it.tipo,
+      valor_num: it.valor_num ?? null,
+      valor_texto: it.valor_texto ?? null,
+    })),
+  });
+  if (error) throw error;
+  return id;
 }
 
 // -------- Fila offline (localStorage) --------
@@ -67,9 +65,11 @@ const FILA = 'isv_fila_v1';
 const lerFila = () => { try { return JSON.parse(localStorage.getItem(FILA)) || []; } catch { return []; } };
 const salvarFila = (f) => localStorage.setItem(FILA, JSON.stringify(f));
 
+/* O id é carimbado ao enfileirar, não ao enviar: se a resposta for
+   reenviada depois, vai com o MESMO id e a RPC ignora a repetição. */
 export function enfileirar(payload) {
   const f = lerFila();
-  f.push(payload);
+  f.push({ ...payload, id: payload.id || crypto.randomUUID() });
   salvarFila(f);
 }
 export const pendentes = () => lerFila().length;

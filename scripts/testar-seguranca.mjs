@@ -70,22 +70,51 @@ console.log('[3] Totem NÃO deve gravar em OUTRA unidade do próprio instituto')
   r.status >= 400 ? passou(`bloqueado (HTTP ${r.status})`) : falhou('gravou em unidade que não é a dele!');
 }
 
-console.log('[4] Totem DEVE gravar na PRÓPRIA unidade');
-let respTeste = null;
+// caminho real da coleta: RPC do 08 (id gerado no cliente, sem devolver linha)
+const rpc = (b) => fetch(`${URL}/rest/v1/rpc/registrar_resposta`, { method: 'POST', headers: TOT, body: JSON.stringify(b) });
+
+console.log('[4] Totem DEVE gravar na PRÓPRIA unidade (via RPC)');
+const respTeste = crypto.randomUUID();
+let gravou = false;
 {
-  const r = await totPost('resposta', { instituto_id: isv.id, unidade_id: minhaUnidade, modelo_id: modelo.id, origem: 'totem' });
-  if (r.status === 201) { respTeste = (await r.json())[0]?.id; passou('gravou normalmente'); }
+  const r = await rpc({ p_id: respTeste, p_unidade: minhaUnidade, p_modelo: modelo.id,
+                        p_itens: [{ tipo: 'nps', valor_num: 9 }] });
+  if (r.ok) { gravou = true; passou('gravou normalmente'); }
   else falhou(`não conseguiu gravar (HTTP ${r.status})`, await r.text());
 }
 
-console.log('[5] Nota fora da faixa deve ser rejeitada (nps = 99)');
-if (respTeste) {
-  const r = await totPost('resposta_item', { instituto_id: isv.id, resposta_id: respTeste, tipo: 'nps', valor_num: 99 });
-  r.status >= 400 ? passou(`bloqueado (HTTP ${r.status})`) : falhou('aceitou nps=99!');
+console.log('[5] Reenvio da MESMA resposta não deve duplicar (idempotência)');
+if (gravou) {
+  await rpc({ p_id: respTeste, p_unidade: minhaUnidade, p_modelo: modelo.id,
+              p_itens: [{ tipo: 'nps', valor_num: 9 }] });
+  const itens = await srvGet(`resposta_item?resposta_id=eq.${respTeste}&select=id`);
+  itens.length === 1 ? passou('continua com 1 item após reenvio')
+                     : falhou(`duplicou: ${itens.length} itens`);
 } else falhou('sem resposta base para testar');
 
+console.log('[6] Nota fora da faixa deve ser rejeitada (nps = 99)');
+{
+  const r = await rpc({ p_id: crypto.randomUUID(), p_unidade: minhaUnidade, p_modelo: modelo.id,
+                        p_itens: [{ tipo: 'nps', valor_num: 99 }] });
+  const cod = r.ok ? null : (await r.json()).code;
+  // Exige o motivo CERTO: check constraint (23514). Se passasse com
+  // qualquer erro, este teste continuaria "verde" com a RPC quebrada.
+  if (r.ok) falhou('aceitou nps=99!');
+  else if (cod === '23514') passou('bloqueado pela constraint de faixa');
+  else falhou(`bloqueado, mas pelo motivo errado (code ${cod})`);
+}
+
+console.log('[7] Transação: item inválido NÃO deve deixar resposta órfã');
+if (gravou) {   // só faz sentido se a RPC comprovadamente grava
+  const orfa = crypto.randomUUID();
+  await rpc({ p_id: orfa, p_unidade: minhaUnidade, p_modelo: modelo.id,
+              p_itens: [{ tipo: 'nps', valor_num: 9 }, { tipo: 'nps', valor_num: 99 }] });
+  const r = await srvGet(`resposta?id=eq.${orfa}&select=id`);
+  r.length === 0 ? passou('nada foi gravado (rollback)') : falhou('sobrou resposta sem itens!');
+} else falhou('RPC não grava — rollback não é testável');
+
 // ---- limpeza ----
-if (respTeste) await srvDel(`resposta?id=eq.${respTeste}`);
+await srvDel(`resposta?id=eq.${respTeste}`);
 await srvDel(`unidade?id=eq.${outraUni.id}`);
 await srvDel(`instituto?id=eq.${vz.id}`);   // cascata leva município e unidade
 
