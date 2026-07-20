@@ -1,32 +1,44 @@
 # =====================================================================
-#  ISV — Pesquisa de Satisfacao : iniciar o app de coleta (segunda-feira)
-#  Uso: clique direito neste arquivo > "Executar com o PowerShell"
-#       ou, no terminal:  .\iniciar.ps1
+#  ISV — Pesquisa de Satisfacao : iniciar os apps
+#  Uso: clique direito > "Executar com o PowerShell"  ou  .\iniciar.ps1
 #
 #  O Supabase (banco na nuvem) esta SEMPRE no ar — nada a reiniciar la.
-#  Este script sobe apenas o app local (Vite) em http://localhost:5173
+#  Este script sobe os dois apps locais:
+#     Coleta (totem) .... http://localhost:5173
+#     Painel (gestao) ... http://localhost:5174
 # =====================================================================
 
 $ErrorActionPreference = 'Stop'
-$app = Join-Path $PSScriptRoot 'app'
 
-Write-Host ''
-Write-Host '  Instituto Sao Vicente - App de Coleta' -ForegroundColor Cyan
-Write-Host '  --------------------------------------' -ForegroundColor DarkGray
-
-if (-not (Test-Path (Join-Path $app 'node_modules'))) {
-  Write-Host '  Primeira vez: instalando dependencias (pode demorar 1-2 min)...' -ForegroundColor Yellow
-  Push-Location $app
-  npm install
-  Pop-Location
+function Preparar($caminho, $nome) {
+  if (-not (Test-Path (Join-Path $caminho 'node_modules'))) {
+    Write-Host "  [$nome] instalando dependencias (1-2 min)..." -ForegroundColor Yellow
+    Push-Location $caminho; npm install; Pop-Location
+  }
 }
 
-Write-Host '  Abrindo http://localhost:5173 no navegador...' -ForegroundColor Green
-Start-Process 'http://localhost:5173'
+$coleta = Join-Path $PSScriptRoot 'app'
+$painel = Join-Path $PSScriptRoot 'dashboard'
 
-Write-Host '  Servidor rodando. Feche esta janela (ou Ctrl+C) para parar.' -ForegroundColor DarkGray
 Write-Host ''
+Write-Host '  Instituto Sao Vicente - Pesquisa de Satisfacao' -ForegroundColor Cyan
+Write-Host '  ----------------------------------------------' -ForegroundColor DarkGray
 
-Push-Location $app
-npm run dev
-Pop-Location
+Preparar $coleta 'coleta'
+Preparar $painel 'painel'
+
+# sobe cada app na sua propria janela
+Start-Process powershell -ArgumentList '-NoExit','-Command',"Set-Location '$coleta'; npm run dev"
+Start-Process powershell -ArgumentList '-NoExit','-Command',"Set-Location '$painel'; npm run dev"
+
+Write-Host '  Aguardando os servidores subirem...' -ForegroundColor DarkGray
+Start-Sleep -Seconds 6
+
+Start-Process 'http://localhost:5173'   # coleta (totem)
+Start-Process 'http://localhost:5174'   # painel (gestao)
+
+Write-Host ''
+Write-Host '  Coleta (totem) : http://localhost:5173' -ForegroundColor Green
+Write-Host '  Painel (gestao): http://localhost:5174' -ForegroundColor Green
+Write-Host ''
+Write-Host '  Feche as janelas do PowerShell abertas para parar os servidores.' -ForegroundColor DarkGray
