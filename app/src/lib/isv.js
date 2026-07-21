@@ -8,12 +8,22 @@ import { supabase } from './supabase';
    disso a sessão persiste no localStorage do próprio aparelho.
    Ver db/10_pareamento_totem.sql para o porquê. */
 
+/* Guarda a Promise em voo: o React.StrictMode (dev) dispara o efeito de
+   inicialização 2x de propósito, e duas chamadas concorrentes aqui criavam
+   DUAS identidades anônimas diferentes (2x signInAnonymously) na mesma carga
+   de página — o pareamento ficava preso a uma, e o app seguia com a outra. */
+let sessaoEmVoo = null;
+
 export async function sessaoAtiva() {
   const { data } = await supabase.auth.getSession();
   if (data.session) return data.session;
-  const { data: anon, error } = await supabase.auth.signInAnonymously();
-  if (error) throw new Error('Falha ao iniciar sessão do totem: ' + error.message);
-  return anon.session;
+  if (!sessaoEmVoo) {
+    sessaoEmVoo = supabase.auth.signInAnonymously().then(({ data: anon, error }) => {
+      if (error) throw new Error('Falha ao iniciar sessão do totem: ' + error.message);
+      return anon.session;
+    });
+  }
+  return sessaoEmVoo;
 }
 
 // Existe usuario_perfil para esta sessão? Se não, o aparelho ainda não pareou.
@@ -47,7 +57,7 @@ export async function carregarConfig() {
 
   const { data: modelo } = await supabase
     .from('modelo_pesquisa').select('id, nome')
-    .order('criado_em', { ascending: true }).limit(1).single();
+    .eq('ativo', true).order('criado_em', { ascending: true }).limit(1).single();
 
   const { data: perguntas, error: eq } = await supabase
     .from('pergunta').select('id, ordem, tipo, texto, obrigatoria')

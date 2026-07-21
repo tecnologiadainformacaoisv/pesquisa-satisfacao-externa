@@ -47,9 +47,13 @@ ou `valor_texto` (comentário) em `resposta_item`.
 **Multi-instituto desde já:** toda tabela tem `instituto_id` + RLS. O isolamento é imposto
 pelo banco. A tela de onboarding de novos institutos é Fase 3 — o schema já está pronto.
 
-## Decisões travadas (17/07/2026)
+## Decisões travadas (17/07/2026, atualizado 21/07/2026)
 
-- Instrumento **configurável por instituto** (ISV começa com o atual: NPS + 4 estrelas + comentário).
+- Instrumento **configurável por instituto**. O ISV tem dois modelos prontos —
+  "(estrelas)", o instrumento real em produção hoje, e "(carinhas)", a variante
+  visual do mspesquisa original — só um fica `ativo` por vez. Trocar com
+  `node scripts/selecionar-modelo.mjs "estrelas"` (ou "carinhas"). Sem tela de
+  admin ainda para isso (fica para a Fase 2 do plano de produto).
 - Multi-instituto **schema-ready** agora; UI depois.
 - **Migrar** todo o histórico do Google Sheets (script da Fase 1).
 

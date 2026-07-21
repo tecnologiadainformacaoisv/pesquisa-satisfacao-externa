@@ -31,13 +31,16 @@ begin
   values (v_inst, v_mun, 'UBS Centro', 'UBS')
   returning id into v_uni;
 
-  -- Modelo de pesquisa (o instrumento atual do ISV) -------------
-  insert into modelo_pesquisa (instituto_id, nome, descricao, coleta_demografia)
-  values (v_inst, 'Satisfação do Paciente — ISV',
-          'Instrumento em produção: NPS + 4 estrelas + comentário', false)
+  -- Dois modelos, mesmo instrumento, formatos diferentes de nota.
+  -- Só um fica ativo por vez (ver scripts/selecionar-modelo.mjs); o app
+  -- carrega sempre o que estiver com ativo=true.
+
+  -- Modelo A (ativo) — instrumento atual do ISV: NPS + 4 estrelas + comentário
+  insert into modelo_pesquisa (instituto_id, nome, descricao, coleta_demografia, ativo)
+  values (v_inst, 'Satisfação do Paciente — ISV (estrelas)',
+          'Instrumento em produção: NPS + 4 estrelas + comentário', false, true)
   returning id into v_mod;
 
-  -- Perguntas (na ordem do formulário atual) --------------------
   insert into pergunta (instituto_id, modelo_id, ordem, tipo, texto, obrigatoria) values
     (v_inst, v_mod, 1, 'nps',     'De 0 a 10, o quanto você recomendaria nossa unidade?', true),
     (v_inst, v_mod, 2, 'estrela', 'Recepção',    true),
@@ -45,6 +48,24 @@ begin
     (v_inst, v_mod, 4, 'estrela', 'Atendimento', true),
     (v_inst, v_mod, 5, 'estrela', 'Tempo de espera', true),
     (v_inst, v_mod, 6, 'texto',   'Quer deixar um comentário?', false);
+
+  -- Modelo B (inativo por padrão) — mesma pergunta, com carinhas em vez de
+  -- estrela (visual do mspesquisa original). Ativar com selecionar-modelo.mjs.
+  declare v_mod_carinha uuid;
+  begin
+    insert into modelo_pesquisa (instituto_id, nome, descricao, coleta_demografia, ativo)
+    values (v_inst, 'Satisfação do Paciente — ISV (carinhas)',
+            'Variante com carinhas em vez de estrelas', false, false)
+    returning id into v_mod_carinha;
+
+    insert into pergunta (instituto_id, modelo_id, ordem, tipo, texto, obrigatoria) values
+      (v_inst, v_mod_carinha, 1, 'nps',     'De 0 a 10, o quanto você recomendaria nossa unidade?', true),
+      (v_inst, v_mod_carinha, 2, 'carinha', 'Recepção',    true),
+      (v_inst, v_mod_carinha, 3, 'carinha', 'Limpeza',     true),
+      (v_inst, v_mod_carinha, 4, 'carinha', 'Atendimento', true),
+      (v_inst, v_mod_carinha, 5, 'carinha', 'Tempo de espera', true),
+      (v_inst, v_mod_carinha, 6, 'texto',   'Quer deixar um comentário?', false);
+  end;
 
   -- Uma resposta de exemplo (para as views retornarem algo) -----
   declare v_resp uuid;
