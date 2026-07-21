@@ -26,12 +26,6 @@ export async function sessaoAtiva() {
   return sessaoEmVoo;
 }
 
-// Existe usuario_perfil para esta sessão? Se não, o aparelho ainda não pareou.
-export async function estaPareado() {
-  const { error } = await supabase.from('usuario_perfil').select('id').single();
-  return !error;
-}
-
 export async function parear(codigo) {
   const { data, error } = await supabase.rpc('parear_totem', { p_codigo: codigo });
   if (error) throw new Error(traduzErroPareamento(error.message));

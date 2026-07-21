@@ -1,214 +1,141 @@
 import { useEffect, useState } from 'react';
-import {
-  sessaoAtiva, estaPareado, parear, carregarConfig, enviar,
-  enfileirar, tentarEnviarFila, pendentes,
-} from './lib/isv';
+import { supabase } from './lib/supabase';
+import { sessaoAtiva, parear } from './lib/isv';
+import ColetaTotem from './ColetaTotem';
+import PainelAdmin from './PainelAdmin';
 
-const NPS = Array.from({ length: 11 }, (_, i) => i);
-const ESTRELAS = [1, 2, 3, 4, 5];
-const CARINHAS = [
-  { v: 1, cor: '#A63A30', rot: 'Ruim' },
-  { v: 2, cor: '#DE8038', rot: 'Razoável' },
-  { v: 3, cor: '#8DC570', rot: 'Bom' },
-  { v: 4, cor: '#479A52', rot: 'Muito bom' },
-  { v: 5, cor: '#0C6036', rot: 'Excelente' },
-];
-
+/* Portão único de entrada: uma sessão (Supabase Auth) já resolve pra sempre
+   quem é quem — o papel em usuario_perfil (ver db/01_schema.sql) diz se é
+   'totem' (vai pra coleta) ou admin (vai pro painel). Como a sessão persiste
+   no localStorage do aparelho/navegador, a escolha (admin vs totem) e o login
+   ou pareamento só aparecem na PRIMEIRA vez — nas próximas cargas, avaliar()
+   já acha a sessão e manda direto pra tela certa. */
 export default function App() {
-  const [fase, setFase] = useState('carregando'); // carregando|parear|erro|form|enviando|obrigado
+  const [estado, setEstado] = useState('carregando');
+  // carregando | escolha | login-admin | parear | coleta | painel | erro
   const [erro, setErro] = useState('');
-  const [cfg, setCfg] = useState(null);
-  const [passo, setPasso] = useState(0);
-  const [resp, setResp] = useState({});           // pergunta_id -> {valor_num|valor_texto}
-  const [salvoOffline, setSalvoOffline] = useState(false);
-  const [fila, setFila] = useState(0);
 
-  async function iniciar() {
+  async function avaliar() {
+    setEstado('carregando');
     try {
-      await sessaoAtiva();
-      if (!(await estaPareado())) { setFase('parear'); return; }
-      const c = await carregarConfig();
-      setCfg(c);
-      setFase('form');
-      tentarEnviarFila().then(() => setFila(pendentes())).catch(() => {});
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) { setEstado('escolha'); return; }
+
+      const { data: perfil, error } = await supabase
+        .from('usuario_perfil').select('papel').eq('id', data.session.user.id).single();
+
+      if (error) {
+        // sessão existe mas ainda não tem perfil: só é normal pro totem
+        // recém-entrado anônimo, que precisa parear antes de tudo.
+        if (data.session.user.is_anonymous) { setEstado('parear'); return; }
+        throw new Error('Sua conta não tem um perfil configurado neste instituto. Fale com o TI.');
+      }
+
+      setEstado(perfil.papel === 'totem' ? 'coleta' : 'painel');
     } catch (e) {
       setErro(e.message || String(e));
-      setFase('erro');
+      setEstado('erro');
     }
   }
 
   useEffect(() => {
-    iniciar();
-    const onNet = () => tentarEnviarFila().then(() => setFila(pendentes())).catch(() => {});
-    window.addEventListener('online', onNet);
-    return () => window.removeEventListener('online', onNet);
+    avaliar();
+    const { data: sub } = supabase.auth.onAuthStateChange((evento) => {
+      if (evento === 'SIGNED_OUT') avaliar();
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
-  async function confirmarPareamento(codigo) {
-    await parear(codigo);       // lança com mensagem amigável em caso de erro
-    await iniciar();            // recarrega config já como 'totem'
-  }
-
-  const perguntas = cfg?.perguntas || [];
-  const p = perguntas[passo];
-  const val = p ? resp[p.id] : undefined;
-  const definir = (v) => setResp((r) => ({ ...r, [p.id]: v }));
-
-  const respondida =
-    !p ? false
-    : p.tipo === 'texto' ? true               // comentário é sempre "ok" (opcional)
-    : val && val.valor_num != null;
-  const podeAvancar = respondida || (p && !p.obrigatoria);
-
-  const avancar = () => {
-    if (passo < perguntas.length - 1) setPasso(passo + 1);
-    else finalizar();
-  };
-  const voltar = () => passo > 0 && setPasso(passo - 1);
-
-  async function finalizar() {
-    setFase('enviando');
-    const itens = perguntas.map((q) => {
-      const v = resp[q.id];
-      if (!v) return null;
-      if (q.tipo === 'texto') {
-        const t = (v.valor_texto || '').trim();
-        return t ? { pergunta_id: q.id, tipo: q.tipo, valor_texto: t } : null;
-      }
-      return v.valor_num != null ? { pergunta_id: q.id, tipo: q.tipo, valor_num: v.valor_num } : null;
-    }).filter(Boolean);
-
-    const payload = {
-      instituto_id: cfg.instituto.id,
-      unidade_id: cfg.unidade.id,
-      modelo_id: cfg.modelo.id,
-      itens,
-    };
+  async function escolherTotem() {
+    setEstado('carregando');
     try {
-      if (!navigator.onLine) throw new Error('offline');
-      await enviar(payload);
-      setSalvoOffline(false);
-    } catch {
-      enfileirar(payload);
-      setSalvoOffline(true);
-      setFila(pendentes());
+      await sessaoAtiva();
+      await avaliar();
+    } catch (e) {
+      setErro(e.message || String(e));
+      setEstado('erro');
     }
-    setFase('obrigado');
-    setTimeout(reiniciar, 4000);
   }
 
-  const reiniciar = () => { setResp({}); setPasso(0); setSalvoOffline(false); setFase('form'); };
+  async function confirmarPareamento(codigo) {
+    await parear(codigo);   // lança com mensagem amigável em caso de erro
+    await avaliar();
+  }
 
-  // ---------- Telas de estado ----------
-  if (fase === 'carregando') return <Centro><div className="spinner" /><p>Carregando…</p></Centro>;
+  if (estado === 'carregando') return <Centro><div className="spinner" /></Centro>;
 
-  if (fase === 'parear') return <TelaPareamento onConfirmar={confirmarPareamento} />;
+  if (estado === 'escolha') return (
+    <TelaEscolha onAdmin={() => setEstado('login-admin')} onTotem={escolherTotem} />
+  );
 
-  if (fase === 'erro') return (
+  if (estado === 'login-admin') return (
+    <TelaLoginAdmin onVoltar={() => setEstado('escolha')} onEntrar={avaliar} />
+  );
+
+  if (estado === 'parear') return <TelaPareamento onConfirmar={confirmarPareamento} />;
+
+  if (estado === 'erro') return (
     <Centro>
-      <h2>Não foi possível iniciar</h2>
+      <h2>Não foi possível continuar</h2>
       <p className="erro">{erro}</p>
       <button className="btn" onClick={() => location.reload()}>Tentar de novo</button>
     </Centro>
   );
 
-  if (fase === 'enviando') return <Centro><div className="spinner" /><p>Enviando…</p></Centro>;
+  if (estado === 'coleta') return <div className="v-coleta"><ColetaTotem /></div>;
+  if (estado === 'painel') return <div className="v-painel"><PainelAdmin /></div>;
+  return null;
+}
 
-  if (fase === 'obrigado') return (
-    <Centro>
-      <div className="check">✓</div>
-      <h1 className="ask-q">Obrigado por participar!</h1>
-      <p className="ask-s">
-        {salvoOffline
-          ? 'Sua resposta foi salva e será enviada quando houver internet.'
-          : 'Sua resposta foi registrada.'}
-      </p>
-    </Centro>
-  );
+/* ---------------- telas do portão ---------------- */
 
-  // ---------- Formulário ----------
+function Centro({ children }) { return <div className="v-gate tela centro">{children}</div>; }
+
+function TelaEscolha({ onAdmin, onTotem }) {
   return (
-    <div className="tela">
-      <header className="topo">
-        <div className="marca">
-          <div className="marca-mark">ISV</div>
-          <div className="marca-txt">
-            <span className="marca-n">{cfg.instituto?.nome || 'Instituto São Vicente'}</span>
-            <span className="marca-s">{cfg.unidade?.nome}</span>
-          </div>
-        </div>
-        <div className="passo-tag">Pergunta {passo + 1} de {perguntas.length}</div>
-      </header>
-
-      <main className="conteudo">
-        <div className="ask">
-          <div className="ask-q">{p.texto}</div>
-          <div className="ask-s">{legenda(p.tipo)}</div>
-        </div>
-
-        {p.tipo === 'nps' && (
-          <div className="nps">
-            {NPS.map((n) => (
-              <button key={n}
-                className={'nps-b' + (val?.valor_num === n ? ' sel' : '')}
-                style={val?.valor_num === n ? { background: corNps(n), borderColor: corNps(n), color: '#fff' } : undefined}
-                onClick={() => definir({ valor_num: n })}>
-                {n}
-              </button>
-            ))}
-            <div className="nps-legenda"><span>Nada provável</span><span>Muito provável</span></div>
-          </div>
-        )}
-
-        {p.tipo === 'estrela' && (
-          <div className="estrelas">
-            {ESTRELAS.map((s) => (
-              <button key={s}
-                className={'estrela' + ((val?.valor_num || 0) >= s ? ' on' : '')}
-                aria-label={`${s} estrela${s > 1 ? 's' : ''}`}
-                onClick={() => definir({ valor_num: s })}>★</button>
-            ))}
-          </div>
-        )}
-
-        {p.tipo === 'carinha' && (
-          <div className="carinhas">
-            {CARINHAS.map((c) => (
-              <button key={c.v}
-                className={'carinha' + (val?.valor_num === c.v ? ' sel' : '')}
-                onClick={() => definir({ valor_num: c.v })}>
-                <Face cor={c.cor} nivel={c.v} />
-                <span className="carinha-l">{c.rot}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {p.tipo === 'texto' && (
-          <textarea className="texto" rows={4}
-            placeholder="Escreva aqui (opcional)…"
-            value={val?.valor_texto || ''}
-            onChange={(e) => definir({ valor_texto: e.target.value })} />
-        )}
-      </main>
-
-      <footer className="rodape">
-        <button className="btn ghost" onClick={voltar} disabled={passo === 0}>Voltar</button>
-        <div className="pontos">
-          {perguntas.map((_, i) => <span key={i} className={'ponto' + (i === passo ? ' on' : '')} />)}
-        </div>
-        <button className="btn" onClick={avancar} disabled={!podeAvancar}>
-          {passo === perguntas.length - 1 ? 'Enviar' : 'Próximo'}
-        </button>
-      </footer>
-
-      {fila > 0 && <div className="offline-banner">{fila} resposta(s) aguardando envio</div>}
-    </div>
+    <Centro>
+      <div className="marca-mark grande">ISV</div>
+      <h1 className="ask-q">Pesquisa de Satisfação</h1>
+      <p className="ask-s">Como você vai entrar?</p>
+      <div className="escolha-botoes">
+        <button className="btn" onClick={onAdmin}>Sou administrador</button>
+        <button className="btn ghost" onClick={onTotem}>Sou o totem desta unidade</button>
+      </div>
+    </Centro>
   );
 }
 
-// ---------- auxiliares ----------
-function Centro({ children }) { return <div className="tela centro">{children}</div>; }
+function TelaLoginAdmin({ onVoltar, onEntrar }) {
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [erro, setErro] = useState('');
+  const [indo, setIndo] = useState(false);
+
+  async function entrar(e) {
+    e.preventDefault();
+    setIndo(true); setErro('');
+    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    if (error) { setErro('E-mail ou senha inválidos.'); setIndo(false); return; }
+    await onEntrar();
+  }
+
+  return (
+    <div className="v-gate login-tela">
+      <form className="login" onSubmit={entrar}>
+        <div className="marca-mark grande">ISV</div>
+        <h1>Painel de satisfação</h1>
+        <p className="ask-s">Entre com sua conta do instituto.</p>
+        <input type="email" placeholder="E-mail" value={email} required
+               onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+        <input type="password" placeholder="Senha" value={senha} required
+               onChange={(e) => setSenha(e.target.value)} autoComplete="current-password" />
+        {erro && <p className="erro">{erro}</p>}
+        <button className="btn" disabled={indo}>{indo ? 'Entrando…' : 'Entrar'}</button>
+        <button className="btn ghost" type="button" onClick={onVoltar} disabled={indo}>Voltar</button>
+      </form>
+    </div>
+  );
+}
 
 function TelaPareamento({ onConfirmar }) {
   const [codigo, setCodigo] = useState('');
@@ -250,31 +177,5 @@ function TelaPareamento({ onConfirmar }) {
         </button>
       </form>
     </Centro>
-  );
-}
-
-function legenda(tipo) {
-  if (tipo === 'nps') return 'Toque em uma nota de 0 a 10.';
-  if (tipo === 'estrela') return 'Toque nas estrelas.';
-  if (tipo === 'carinha') return 'Toque na carinha que representa o que você sentiu.';
-  return 'Se quiser, deixe um comentário.';
-}
-const corNps = (n) => (n <= 6 ? '#A63A30' : n <= 8 ? '#DE8038' : '#0C6036');
-
-function Face({ cor, nivel }) {
-  const boca =
-    nivel <= 1 ? 'M30 70 Q50 52 70 70'
-    : nivel === 2 ? 'M31 68 Q50 60 69 68'
-    : nivel === 3 ? 'M31 65 L69 65'
-    : nivel === 4 ? 'M31 61 Q50 74 69 61'
-    : 'M29 59 Q50 80 71 59';
-  const olho = nivel === 2 || nivel === 3 ? '#3A2210' : '#fff';
-  return (
-    <svg viewBox="0 0 100 100" width="100%" aria-hidden="true">
-      <circle cx="50" cy="50" r="46" fill={cor} />
-      <circle cx="37" cy="41" r="5" fill={olho} />
-      <circle cx="63" cy="41" r="5" fill={olho} />
-      <path d={boca} fill="none" stroke={olho} strokeWidth="6.5" strokeLinecap="round" />
-    </svg>
   );
 }

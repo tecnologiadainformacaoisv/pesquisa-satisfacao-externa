@@ -1,9 +1,9 @@
 {
-  "name": "isv-coleta",
+  "name": "isv-app",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Pesquisa de Satisfação ISV — app de coleta (totem) sobre Supabase",
+  "description": "Pesquisa de Satisfação ISV — coleta (totem) + painel de gestão, unificados, sobre Supabase",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

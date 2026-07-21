@@ -10,8 +10,8 @@ export default defineConfig({
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Pesquisa de Satisfação — ISV',
-        short_name: 'ISV Coleta',
-        description: 'App de coleta (totem) do Instituto São Vicente',
+        short_name: 'ISV',
+        description: 'Coleta (totem) e painel de gestão do Instituto São Vicente',
         theme_color: '#0B6E63',
         background_color: '#0B6E63',
         display: 'standalone',

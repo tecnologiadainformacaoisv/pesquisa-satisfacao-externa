@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 import {
   carregarTudo, resumo, npsPorUnidade, satisfacaoPorMes, mediaPorPergunta,
@@ -10,30 +10,21 @@ const mesRot = (iso) => {
   return ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][+m - 1] + '/' + a.slice(2);
 };
 
-export default function App() {
-  const [sessao, setSessao] = useState(undefined); // undefined=checando, null=deslogado
+/* Assume que quem chama já autenticou como admin (ver App.jsx) — este
+   componente só carrega e mostra os relatórios do instituto. */
+export default function PainelAdmin() {
   const [dados, setDados] = useState(null);
-  const [carregando, setCarregando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   const [unidadeId, setUnidadeId] = useState('');
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSessao(data.session ?? null));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSessao(s ?? null));
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!sessao) { setDados(null); return; }
     setCarregando(true); setErro('');
     carregarTudo()
       .then(setDados)
       .catch((e) => setErro(e.message || String(e)))
       .finally(() => setCarregando(false));
-  }, [sessao]);
-
-  if (sessao === undefined) return <Centro><div className="spinner" /></Centro>;
-  if (!sessao) return <Login />;
+  }, []);
 
   const filtro = unidadeId || null;
   const r = dados ? resumo(dados, filtro) : null;
@@ -136,37 +127,6 @@ export default function App() {
 }
 
 /* ---------------- componentes ---------------- */
-
-function Login() {
-  const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
-  const [erro, setErro] = useState('');
-  const [indo, setIndo] = useState(false);
-
-  async function entrar(e) {
-    e.preventDefault();
-    setIndo(true); setErro('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-    if (error) setErro('E-mail ou senha inválidos.');
-    setIndo(false);
-  }
-
-  return (
-    <div className="login-tela">
-      <form className="login" onSubmit={entrar}>
-        <div className="mark grande">ISV</div>
-        <h1>Painel de satisfação</h1>
-        <p className="sub">Entre com sua conta do instituto.</p>
-        <input type="email" placeholder="E-mail" value={email} required
-               onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
-        <input type="password" placeholder="Senha" value={senha} required
-               onChange={(e) => setSenha(e.target.value)} autoComplete="current-password" />
-        {erro && <p className="erro">{erro}</p>}
-        <button className="btn" disabled={indo}>{indo ? 'Entrando…' : 'Entrar'}</button>
-      </form>
-    </div>
-  );
-}
 
 function Centro({ children }) { return <div className="centro">{children}</div>; }
 

@@ -1,21 +1,35 @@
 # Produto ISV — Pesquisa de Satisfação (SaaS)
 
-Base do produto novo, construída **do zero** sobre Supabase, usando o `mspesquisa`
+Produto novo, construído **do zero** sobre Supabase, usando o `mspesquisa`
 como planta baixa (modelo de dados) e o instrumento do ISV em produção como referência
 funcional. **Não altera** as pastas originais `mspesquisa-back-main` / `mspesquisa-front-main`.
 
-> Fase 0 do roadmap (ver `../Plano-Produto-ISV.pdf`). Aqui está só o banco.
+> Fase 1 do roadmap (ver `../Plano-Produto-ISV.pdf`) — schema pronto, coleta e painel
+> funcionando; falta o cutover (deploy real + desligar o sistema antigo).
 
 ## Estrutura
 
 ```
 produto-isv/
-└── db/
-    ├── 01_schema.sql        Tipos, tabelas e índices
-    ├── 02_rls.sql           Row Level Security (isolamento multi-instituto)
-    ├── 03_views.sql         Agregações: satisfação, NPS, distribuição, comentários
-    └── 04_seed_exemplo.sql  Instituto ISV + instrumento atual + 1 resposta de teste
+├── db/                     SQL do banco (rodar em ordem no Supabase, 01→10)
+│   ├── 01_schema.sql       Tipos, tabelas e índices
+│   ├── 02_rls.sql          Row Level Security (isolamento multi-instituto)
+│   ├── 03_views.sql        Agregações: satisfação, NPS, distribuição, comentários
+│   ├── 04_seed_exemplo.sql Instituto ISV + 2 modelos de questionário + resposta de teste
+│   ├── 05_bootstrap_admin.sql
+│   ├── 06..09              Correções de segurança (RLS, RPC transacional/idempotente)
+│   └── 10_pareamento_totem.sql  Pareamento do totem por código de uso único
+├── scripts/                Utilitários Node (rodam local, usam service_role)
+│   ├── gerar-codigo-totem.mjs   Gera código de pareamento pra um tablet novo
+│   ├── selecionar-modelo.mjs    Troca qual questionário está ativo
+│   └── ...
+├── app/                    O app único (coleta + painel), Vite + React + supabase-js
+│   └── ver app/README.md pra detalhes de como funciona o portão de entrada
+└── iniciar.ps1              Sobe o app local (http://localhost:5173)
 ```
+
+Coleta e painel de gestão são **um só app** — a tela inicial decide pra onde mandar
+com base em quem faz login (ver `app/README.md`).
 
 ## Como aplicar no Supabase
 

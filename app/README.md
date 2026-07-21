@@ -1,7 +1,8 @@
-# ISV — App de Coleta (totem)
+# ISV — App (coleta + painel, unificados)
 
-Formulário de pesquisa de satisfação (o "totem") do produto novo, em **Vite + React + supabase-js**.
-Lê o questionário do Supabase (motor de perguntas tipado) e grava as respostas via RLS.
+Um só app Vite + React + supabase-js com **dois papéis**: coleta de pesquisa (o "totem")
+e painel de gestão (relatórios). Um portão de entrada (`App.jsx`) decide qual mostrar,
+lendo o `papel` do `usuario_perfil` da sessão ativa — o mesmo endereço serve os dois.
 
 ## Rodar
 
@@ -16,19 +17,27 @@ Config em `app/.env` (ignorado pelo git) — só `VITE_SUPABASE_URL` e `VITE_SUP
 
 ## Como funciona
 
-- **Sessão + pareamento** (`lib/isv.js` → `sessaoAtiva`/`estaPareado`/`parear`): o app entra
+- **Portão** (`App.jsx` → `avaliar()`): olha a sessão do Supabase. Sem sessão, mostra a
+  escolha "Sou administrador" / "Sou o totem desta unidade". Com sessão, lê
+  `usuario_perfil.papel` e manda direto para `ColetaTotem` (papel `totem`) ou
+  `PainelAdmin` (qualquer papel de admin) — **sem passar pela escolha de novo**, porque
+  a sessão persiste no `localStorage` do aparelho/navegador. Só aparece na primeira vez.
+- **Sessão + pareamento do totem** (`lib/isv.js` → `sessaoAtiva`/`parear`): o totem entra
   ANÔNIMO (`supabase.auth.signInAnonymously`) — sem nenhuma credencial no bundle. Um aparelho
   anônimo ainda não tem `usuario_perfil`, então não grava nada. Na primeira vez, a tela pede um
   código de 8 letras que o TI gera com `../scripts/gerar-codigo-totem.mjs` e digita, uma vez,
   direto no aparelho. A RPC `parear_totem` (`../db/10_pareamento_totem.sql`) valida o código e
-  vincula esse dispositivo — só ele — a um perfil `papel='totem'` da unidade certa. Depois disso
-  a sessão persiste no `localStorage` do aparelho; o pareamento não se repete.
-- **Config** (`carregarConfig`): lê instituto, unidade, modelo e perguntas via RLS.
-- **Coleta** (`App.jsx`): uma pergunta por tela, renderizada pelo `tipo`
-  (`nps` 0–10, `estrela`, `carinha`, `texto`). Botões grandes, tema claro fixo.
+  vincula esse dispositivo — só ele — a um perfil `papel='totem'` da unidade certa.
+- **Login do admin**: e-mail/senha normal (`supabase.auth.signInWithPassword`), como qualquer
+  usuário Supabase Auth — precisa ter um `usuario_perfil` com papel de admin já cadastrado.
+- **Coleta** (`ColetaTotem.jsx`): uma pergunta por tela, renderizada pelo `tipo`
+  (`nps` 0–10, `estrela`, `carinha`, `texto`). Botões grandes, tema claro fixo, funciona
+  offline (Service Worker, ver `vite.config.js`) depois da primeira carga.
 - **Envio** (`enviar`): chama a RPC `registrar_resposta` (`../db/08`/`09`) — resposta + itens
   numa transação, id gerado no cliente (idempotente). Se estiver offline ou falhar, enfileira em
   `localStorage` e reenvia quando a conexão volta (`tentarEnviarFila`).
+- **Painel** (`PainelAdmin.jsx`): KPIs, NPS, satisfação por unidade/mês, comentários — lê as
+  views do Supabase (`lib/dados.js`), tudo sob RLS (só enxerga o próprio instituto).
 
 ## Pareamento de um tablet novo
 
@@ -36,10 +45,11 @@ Config em `app/.env` (ignorado pelo git) — só `VITE_SUPABASE_URL` e `VITE_SUP
 node ../scripts/gerar-codigo-totem.mjs "Nome da Unidade"
 ```
 
-Digite o código de 8 letras na tela do tablet — expira em 30 min e só funciona uma vez.
-Exige o toggle "Allow anonymous sign-ins" ativado no Supabase (Authentication → Sign In / Providers).
+Digite o código de 8 letras na tela do tablet — expira em 30-60 min (ajustável) e só
+funciona uma vez. Exige o toggle "Allow anonymous sign-ins" ativado no Supabase
+(Authentication → Sign In / Providers).
 
 ## Pendências
 
-- [ ] Service Worker / PWA (instalável, cache offline).
 - [ ] Tela de configuração da unidade (hoje fixa via `usuario_perfil`).
+- [ ] Tela de admin pra cadastrar unidade/pergunta/usuário (hoje é via script/SQL).
