@@ -30,17 +30,25 @@ export default defineConfig({
       },
       workbox: {
         // O app shell (JS/CSS/HTML) fica pré-cacheado. As respostas de leitura
-        // do Supabase (config/perguntas) ficam em cache "melhor esforço": usa a
-        // rede quando dá, cai pro último cache bom se estiver offline. A
-        // gravação de resposta já tem fila própria em localStorage (isv.js) —
-        // não precisa (e não deve) passar pelo cache do service worker.
+        // do Supabase usadas pela COLETA (config/perguntas) ficam em cache
+        // "melhor esforço": usa a rede quando dá, cai pro último cache bom se
+        // estiver offline. A gravação de resposta já tem fila própria em
+        // localStorage (isv.js) — não precisa (e não deve) passar pelo cache
+        // do service worker.
+        //
+        // Importante: as views do PAINEL (vw_comentarios, vw_nps_*, etc.) são
+        // deliberadamente excluídas daqui — elas expõem comentário livre de
+        // paciente, e cachear isso no navegador deixaria dado de saúde
+        // acessível no Cache Storage mesmo depois do admin sair da conta.
+        // O painel não precisa funcionar offline; a coleta precisa.
         runtimeCaching: [
           {
             urlPattern: ({ url, request }) =>
-              url.hostname.endsWith('.supabase.co') && request.method === 'GET',
+              url.hostname.endsWith('.supabase.co') && request.method === 'GET'
+              && !url.pathname.includes('/rest/v1/vw_'),
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'isv-supabase-leitura',
+              cacheName: 'isv-supabase-leitura-v2',
               networkTimeoutSeconds: 4,
               expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },
