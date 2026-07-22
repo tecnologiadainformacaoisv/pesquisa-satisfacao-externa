@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from './lib/supabase';
 import {
   carregarVisaoGeral, resumoPorInstituto, totaisGerais, criarInstituto, slugify, atualizarInstituto,
@@ -174,13 +174,18 @@ function GerenciarInstituto({ institutos, onMudou }) {
   const [detalhes, setDetalhes] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
+  // guarda qual troca de instituto é a mais recente — se o operador mudar
+  // de instituto rápido (ou uma resposta antiga demorar), uma resposta
+  // desatualizada não pode sobrescrever o que já está selecionado agora.
+  const selecaoAtual = useRef(0);
 
   function recarregar(id) {
+    const minhaSelecao = ++selecaoAtual.current;
     setCarregando(true); setErro('');
     return carregarDetalhesInstituto(id)
-      .then(setDetalhes)
-      .catch((e) => setErro(e.message || String(e)))
-      .finally(() => setCarregando(false));
+      .then((d) => { if (selecaoAtual.current === minhaSelecao) setDetalhes(d); })
+      .catch((e) => { if (selecaoAtual.current === minhaSelecao) setErro(e.message || String(e)); })
+      .finally(() => { if (selecaoAtual.current === minhaSelecao) setCarregando(false); });
   }
 
   function selecionar(id) {
@@ -206,10 +211,15 @@ function GerenciarInstituto({ institutos, onMudou }) {
         </select>
       </label>
 
-      {carregando && <p className="sub">Carregando…</p>}
+      {carregando && !detalhes && <p className="sub">Carregando…</p>}
       {erro && <p className="erro">{erro}</p>}
 
-      {instituto && detalhes && !carregando && (
+      {/* depende só de `detalhes` existir, não de `!carregando` — senão
+          qualquer cadastro/edição em QUALQUER bloco (que dispara um
+          refresh em segundo plano via atualizarTudo) desmonta e remonta
+          a árvore inteira, resetando o formulário do instituto e
+          qualquer edição em andamento nos blocos vizinhos. */}
+      {instituto && detalhes && (
         <>
           <EditorInstituto instituto={instituto} onMudou={onMudou} />
           <div className="gerenciar-blocos">
