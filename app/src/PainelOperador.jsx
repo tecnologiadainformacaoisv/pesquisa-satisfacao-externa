@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
-import { carregarVisaoGeral, resumoPorInstituto, totaisGerais } from './lib/operador';
+import { carregarVisaoGeral, resumoPorInstituto, totaisGerais, criarInstituto, slugify } from './lib/operador';
 
 /* Visão do dono do SaaS (papel='admin', cross-instituto) — não é a visão de
    nenhum instituto específico, é "quantas empresas estamos atendendo e como
@@ -11,13 +11,15 @@ export default function PainelOperador() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
 
-  useEffect(() => {
+  function carregar() {
     setCarregando(true); setErro('');
-    carregarVisaoGeral()
+    return carregarVisaoGeral()
       .then(setDados)
       .catch((e) => setErro(e.message || String(e)))
       .finally(() => setCarregando(false));
-  }, []);
+  }
+
+  useEffect(() => { carregar(); }, []);
 
   const totais = dados ? totaisGerais(dados) : null;
   const porInstituto = dados ? resumoPorInstituto(dados) : [];
@@ -48,6 +50,10 @@ export default function PainelOperador() {
             <Kpi rotulo="Unidades" valor={totais.unidades} nota="pontos de coleta" />
             <Kpi rotulo="Respostas" valor={totais.respostas} nota="em todos os institutos" />
           </section>
+
+          <Card titulo="Novo instituto" sub="Cadastra um cliente novo no SaaS" larga>
+            <FormNovoInstituto onCriado={carregar} />
+          </Card>
 
           <Card titulo="Por instituto" sub="NPS e índice de satisfação de cada cliente" larga>
             {porInstituto.length === 0 ? <p className="sub">Nenhum instituto cadastrado.</p> : (
@@ -85,6 +91,64 @@ export default function PainelOperador() {
         </main>
       )}
     </div>
+  );
+}
+
+function FormNovoInstituto({ onCriado }) {
+  const [nome, setNome] = useState('');
+  const [slug, setSlug] = useState('');
+  const [slugTocado, setSlugTocado] = useState(false);
+  const [cor, setCor] = useState('#0B6E63');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [ok, setOk] = useState('');
+
+  function mudarNome(v) {
+    setNome(v);
+    if (!slugTocado) setSlug(slugify(v));
+  }
+
+  async function enviar(e) {
+    e.preventDefault();
+    setEnviando(true); setErro(''); setOk('');
+    try {
+      const criado = await criarInstituto({ nome: nome.trim(), slug: slug.trim(), cor });
+      setOk(`"${criado.nome}" criado — já aparece na tabela abaixo.`);
+      setNome(''); setSlug(''); setSlugTocado(false); setCor('#0B6E63');
+      await onCriado();
+    } catch (err) {
+      setErro(err.message || String(err));
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <form className="form-instituto" onSubmit={enviar}>
+      <div className="form-linha">
+        <label>
+          Nome
+          <input value={nome} onChange={(e) => mudarNome(e.target.value)} required
+                 placeholder="Ex.: Rede Bem Estar" />
+        </label>
+        <label>
+          Identificador (slug)
+          <input value={slug} onChange={(e) => { setSlug(e.target.value); setSlugTocado(true); }} required
+                 placeholder="rede-bem-estar" />
+        </label>
+        <label className="form-cor">
+          Cor
+          <input type="color" value={cor} onChange={(e) => setCor(e.target.value)} />
+        </label>
+        <button className="btn" disabled={enviando}>{enviando ? 'Criando…' : 'Criar instituto'}</button>
+      </div>
+      {erro && <p className="erro">{erro}</p>}
+      {ok && <p className="sub" style={{ color: 'var(--good)' }}>{ok}</p>}
+      <p className="sub">
+        Depois de criado, cadastre município/unidades/questionário via script
+        (ainda não tem tela pra isso — próximo passo).
+      </p>
+    </form>
   );
 }
 

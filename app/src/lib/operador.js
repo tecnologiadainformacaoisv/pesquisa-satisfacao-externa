@@ -56,3 +56,29 @@ export function totaisGerais({ institutos, municipios, unidades, nps }) {
     respostas: soma(nps, 'total'),
   };
 }
+
+export function slugify(nome) {
+  return nome
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')  // tira acento
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/* INSERT passa pela RLS normal (instituto_mod, db/02_rls.sql) — só
+   is_super_admin() consegue criar um instituto novo (pra qualquer outro
+   papel, o WITH CHECK exige id = current_instituto_id(), que uma linha
+   nova nunca satisfaz). Não precisa de service_role: é o próprio operador
+   logado criando, com o supabase-js normal. */
+export async function criarInstituto({ nome, slug, cor }) {
+  const { data, error } = await supabase
+    .from('instituto')
+    .insert([{ nome, slug, cor_acento: cor }])
+    .select('id, nome, cor_acento')
+    .single();
+  if (error) {
+    if (error.code === '23505') throw new Error(`Já existe um instituto com o identificador "${slug}". Tente outro nome.`);
+    throw new Error(error.message);
+  }
+  return data;
+}
