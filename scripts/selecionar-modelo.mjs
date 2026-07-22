@@ -34,14 +34,18 @@ if (!termo) {
   if (!alvo) {
     console.error(`Nenhum modelo com "${termo}" no nome.`);
   } else {
-    for (const m of modelos) {
-      const r = await rest(`modelo_pesquisa?id=eq.${m.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ ativo: m.id === alvo.id }),
-      });
-      if (!r.ok) console.error('falha ao atualizar', m.nome, r.status, await r.text());
+    // RPC (db/11) faz tudo num UPDATE só — não tem como parar no meio e
+    // deixar o instituto sem nenhum modelo ativo (o que um PATCH por linha
+    // permitia se o script fosse interrompido entre um e outro).
+    const r = await rest('rpc/selecionar_modelo', {
+      method: 'POST',
+      body: JSON.stringify({ p_modelo_id: alvo.id }),
+    });
+    if (!r.ok) {
+      console.error('falha ao trocar de modelo:', r.status, await r.text());
+    } else {
+      console.log(`\n✓ Ativo agora: ${alvo.nome}`);
+      console.log('(o totem pega o modelo novo na próxima vez que a página carregar)');
     }
-    console.log(`\n✓ Ativo agora: ${alvo.nome}`);
-    console.log('(o totem pega o modelo novo na próxima vez que a página carregar)');
   }
 }

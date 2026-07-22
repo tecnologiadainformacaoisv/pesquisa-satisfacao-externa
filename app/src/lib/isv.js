@@ -49,9 +49,10 @@ export async function carregarConfig() {
   const { data: unidade } = await supabase
     .from('unidade').select('id, nome').eq('id', perfil.unidade_id).single();
 
-  const { data: modelo } = await supabase
+  const { data: modelo, error: em } = await supabase
     .from('modelo_pesquisa').select('id, nome')
     .eq('ativo', true).order('criado_em', { ascending: true }).limit(1).single();
+  if (em) throw new Error('Nenhum questionário ativo configurado para este instituto: ' + em.message);
 
   const { data: perguntas, error: eq } = await supabase
     .from('pergunta').select('id, ordem, tipo, texto, obrigatoria')
