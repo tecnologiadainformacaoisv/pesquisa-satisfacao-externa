@@ -189,6 +189,26 @@ h1,h2{ font-family:var(--font-dp); letter-spacing:-.015em; margin:0; }
   border-radius:9px; padding:2px; background:var(--surface); cursor:pointer; }
 .v-painel .form-linha .btn{ flex:0 0 auto; }
 
+/* gerenciar instituto (município/unidade/questionário) */
+.v-painel .gerenciar{ display:flex; flex-direction:column; gap:16px; }
+.v-painel .gerenciar-select{ display:flex; flex-direction:column; gap:5px; font-size:.78rem;
+  font-weight:650; color:var(--ink-2); max-width:340px; }
+.v-painel .gerenciar-select select{ background:var(--paper); border:1px solid var(--line-2); color:var(--ink);
+  border-radius:9px; padding:11px 12px; font-size:.9rem; font-weight:400; }
+.v-painel .gerenciar-blocos{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
+.v-painel .gerenciar-bloco{ background:var(--paper); border:1px solid var(--line); border-radius:var(--r);
+  padding:16px; display:flex; flex-direction:column; gap:10px; }
+.v-painel .gerenciar-bloco h3{ font-size:.92rem; font-family:var(--font); font-weight:700; margin:0; }
+.v-painel .lista-simples{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;
+  font-size:.85rem; }
+.v-painel ol.lista-simples{ list-style:decimal; padding-left:18px; }
+.v-painel .form-linha-compacta label{ font-size:.74rem; min-width:120px; }
+.v-painel .form-linha-compacta select{ background:var(--paper); border:1px solid var(--line-2); color:var(--ink);
+  border-radius:9px; padding:11px 12px; font-size:.85rem; font-weight:400; }
+.v-painel .form-uf{ max-width:70px; }
+.v-painel .form-checkbox{ flex-direction:row !important; align-items:center; gap:6px !important; }
+.v-painel .form-checkbox input{ width:auto; }
+
 .v-painel .kpi{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r);
   padding:18px 20px; display:flex; flex-direction:column; gap:3px; }
 .v-painel .kpi-r{ font-size:.74rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }

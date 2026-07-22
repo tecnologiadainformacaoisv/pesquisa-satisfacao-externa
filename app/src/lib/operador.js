@@ -82,3 +82,52 @@ export async function criarInstituto({ nome, slug, cor }) {
   }
   return data;
 }
+
+/* Tudo abaixo passa pela mesma RLS (municipio_mod/unidade_mod/modelo_mod/
+   pergunta_mod, db/02_rls.sql) — is_super_admin() já bypassa o
+   instituto_id=current_instituto_id() que travaria qualquer outro papel,
+   então o operador consegue cadastrar em QUALQUER instituto sem
+   service_role, só com a própria sessão logada. */
+
+export async function carregarDetalhesInstituto(institutoId) {
+  const [municipios, unidades, modelos] = await Promise.all([
+    supabase.from('municipio').select('id, nome, uf').eq('instituto_id', institutoId).order('nome').then((r) => r.data || []),
+    supabase.from('unidade').select('id, nome, tipo, municipio_id').eq('instituto_id', institutoId).order('nome').then((r) => r.data || []),
+    supabase.from('modelo_pesquisa').select('id, nome, ativo').eq('instituto_id', institutoId).order('criado_em').then((r) => r.data || []),
+  ]);
+  let perguntas = [];
+  if (modelos.length) {
+    perguntas = await supabase.from('pergunta').select('id, modelo_id, ordem, tipo, texto, obrigatoria')
+      .in('modelo_id', modelos.map((m) => m.id)).order('ordem').then((r) => r.data || []);
+  }
+  return { municipios, unidades, modelos, perguntas };
+}
+
+export async function criarMunicipio({ instituto_id, nome, uf }) {
+  const { data, error } = await supabase.from('municipio')
+    .insert([{ instituto_id, nome, uf: uf || null }]).select('id, nome, uf').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function criarUnidade({ instituto_id, municipio_id, nome, tipo }) {
+  const { data, error } = await supabase.from('unidade')
+    .insert([{ instituto_id, municipio_id, nome, tipo: tipo || null }]).select('id, nome, tipo, municipio_id').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function criarModeloPesquisa({ instituto_id, nome }) {
+  const { data, error } = await supabase.from('modelo_pesquisa')
+    .insert([{ instituto_id, nome, ativo: true }]).select('id, nome, ativo').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function criarPergunta({ instituto_id, modelo_id, ordem, tipo, texto, obrigatoria }) {
+  const { data, error } = await supabase.from('pergunta')
+    .insert([{ instituto_id, modelo_id, ordem, tipo, texto, obrigatoria }])
+    .select('id, ordem, tipo, texto, obrigatoria').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
