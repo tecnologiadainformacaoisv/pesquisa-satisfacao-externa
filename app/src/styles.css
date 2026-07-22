@@ -23,6 +23,12 @@
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -14px rgba(0,0,0,.6);
   }
 }
+/* .v-painel é descendente de <body> (nunca ancestral) — as variáveis de tema
+   escuro acima só existem dentro dele. `color`/`background` do <body> foram
+   resolvidos LÁ FORA desse escopo (sempre modo claro) e simplesmente
+   herdavam pra dentro, deixando texto escuro sobre cartão escuro. Reafirmar
+   os dois aqui faz tudo dentro do painel resolver as variáveis certas. */
+.v-painel{ min-height:100%; background:var(--paper); color:var(--ink); }
 
 *{ box-sizing:border-box; }
 html,body,#root{ height:100%; margin:0; }
