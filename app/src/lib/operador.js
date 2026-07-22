@@ -83,6 +83,13 @@ export async function criarInstituto({ nome, slug, cor }) {
   return data;
 }
 
+export async function atualizarInstituto(id, { nome, cor }) {
+  const { data, error } = await supabase.from('instituto')
+    .update({ nome, cor_acento: cor }).eq('id', id).select('id, nome, cor_acento').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 /* Tudo abaixo passa pela mesma RLS (municipio_mod/unidade_mod/modelo_mod/
    pergunta_mod, db/02_rls.sql) — is_super_admin() já bypassa o
    instituto_id=current_instituto_id() que travaria qualquer outro papel,
@@ -110,11 +117,38 @@ export async function criarMunicipio({ instituto_id, nome, uf }) {
   return data;
 }
 
+export async function atualizarMunicipio(id, { nome, uf }) {
+  const { data, error } = await supabase.from('municipio')
+    .update({ nome, uf: uf || null }).eq('id', id).select('id, nome, uf').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/* on delete cascade em unidade.municipio_id — apagar um município leva as
+   unidades dele junto. O aviso de confirmação (na tela) é o que impede o
+   clique acidental; aqui não duplicamos essa checagem. */
+export async function excluirMunicipio(id) {
+  const { error } = await supabase.from('municipio').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 export async function criarUnidade({ instituto_id, municipio_id, nome, tipo }) {
   const { data, error } = await supabase.from('unidade')
     .insert([{ instituto_id, municipio_id, nome, tipo: tipo || null }]).select('id, nome, tipo, municipio_id').single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+export async function atualizarUnidade(id, { nome, tipo, municipio_id }) {
+  const { data, error } = await supabase.from('unidade')
+    .update({ nome, tipo: tipo || null, municipio_id }).eq('id', id).select('id, nome, tipo, municipio_id').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function excluirUnidade(id) {
+  const { error } = await supabase.from('unidade').delete().eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 export async function criarModeloPesquisa({ instituto_id, nome }) {
@@ -130,4 +164,19 @@ export async function criarPergunta({ instituto_id, modelo_id, ordem, tipo, text
     .select('id, ordem, tipo, texto, obrigatoria').single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+export async function atualizarPergunta(id, { texto, tipo, obrigatoria }) {
+  const { data, error } = await supabase.from('pergunta')
+    .update({ texto, tipo, obrigatoria }).eq('id', id).select('id, ordem, tipo, texto, obrigatoria').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/* pergunta_id em resposta_item é "on delete set null" (db/01_schema.sql) —
+   apagar uma pergunta NÃO apaga respostas já dadas, só desvincula o
+   histórico daquela pergunta especifica (mantém tipo/valor). */
+export async function excluirPergunta(id) {
+  const { error } = await supabase.from('pergunta').delete().eq('id', id);
+  if (error) throw new Error(error.message);
 }

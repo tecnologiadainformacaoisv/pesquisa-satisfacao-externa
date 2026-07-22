@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 import {
-  carregarVisaoGeral, resumoPorInstituto, totaisGerais, criarInstituto, slugify,
-  carregarDetalhesInstituto, criarMunicipio, criarUnidade, criarModeloPesquisa, criarPergunta,
+  carregarVisaoGeral, resumoPorInstituto, totaisGerais, criarInstituto, slugify, atualizarInstituto,
+  carregarDetalhesInstituto, criarMunicipio, atualizarMunicipio, excluirMunicipio,
+  criarUnidade, atualizarUnidade, excluirUnidade,
+  criarModeloPesquisa, criarPergunta, atualizarPergunta, excluirPergunta,
 } from './lib/operador';
 
 const TIPOS_PERGUNTA = [
@@ -192,6 +194,8 @@ function GerenciarInstituto({ institutos, onMudou }) {
     await onMudou();
   }
 
+  const instituto = institutos.find((i) => i.id === institutoId);
+
   return (
     <div className="gerenciar">
       <label className="gerenciar-select">
@@ -205,14 +209,55 @@ function GerenciarInstituto({ institutos, onMudou }) {
       {carregando && <p className="sub">Carregando…</p>}
       {erro && <p className="erro">{erro}</p>}
 
-      {detalhes && !carregando && (
-        <div className="gerenciar-blocos">
-          <BlocoMunicipios institutoId={institutoId} municipios={detalhes.municipios} onMudou={atualizarTudo} />
-          <BlocoUnidades institutoId={institutoId} municipios={detalhes.municipios} unidades={detalhes.unidades} onMudou={atualizarTudo} />
-          <BlocoQuestionario institutoId={institutoId} modelos={detalhes.modelos} perguntas={detalhes.perguntas} onMudou={atualizarTudo} />
-        </div>
+      {instituto && detalhes && !carregando && (
+        <>
+          <EditorInstituto instituto={instituto} onMudou={onMudou} />
+          <div className="gerenciar-blocos">
+            <BlocoMunicipios institutoId={institutoId} municipios={detalhes.municipios} onMudou={atualizarTudo} />
+            <BlocoUnidades institutoId={institutoId} municipios={detalhes.municipios} unidades={detalhes.unidades} onMudou={atualizarTudo} />
+            <BlocoQuestionario institutoId={institutoId} modelos={detalhes.modelos} perguntas={detalhes.perguntas} onMudou={atualizarTudo} />
+          </div>
+        </>
       )}
     </div>
+  );
+}
+
+function EditorInstituto({ instituto, onMudou }) {
+  const [nome, setNome] = useState(instituto.nome);
+  const [cor, setCor] = useState(instituto.cor_acento || '#0B6E63');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [ok, setOk] = useState(false);
+
+  // troca de instituto selecionado no dropdown -> recomeça os campos
+  useEffect(() => { setNome(instituto.nome); setCor(instituto.cor_acento || '#0B6E63'); setOk(false); }, [instituto.id]);
+
+  async function salvar(e) {
+    e.preventDefault();
+    setEnviando(true); setErro(''); setOk(false);
+    try {
+      await atualizarInstituto(instituto.id, { nome: nome.trim(), cor });
+      setOk(true);
+      await onMudou();
+    } catch (err) { setErro(err.message || String(err)); }
+    finally { setEnviando(false); }
+  }
+
+  return (
+    <form className="form-linha form-linha-compacta" onSubmit={salvar}>
+      <label>
+        Nome do instituto
+        <input value={nome} onChange={(e) => setNome(e.target.value)} required />
+      </label>
+      <label className="form-cor">
+        Cor
+        <input type="color" value={cor} onChange={(e) => setCor(e.target.value)} />
+      </label>
+      <button className="btn ghost" disabled={enviando}>{enviando ? 'Salvando…' : 'Salvar instituto'}</button>
+      {ok && <span className="sub" style={{ color: 'var(--good)' }}>Salvo.</span>}
+      {erro && <p className="erro">{erro}</p>}
+    </form>
   );
 }
 
@@ -221,6 +266,7 @@ function BlocoMunicipios({ institutoId, municipios, onMudou }) {
   const [uf, setUf] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
+  const [editandoId, setEditandoId] = useState(null);
 
   async function enviar(e) {
     e.preventDefault();
@@ -233,12 +279,30 @@ function BlocoMunicipios({ institutoId, municipios, onMudou }) {
     finally { setEnviando(false); }
   }
 
+  async function excluir(m) {
+    if (!window.confirm(`Excluir "${m.nome}"? Isso apaga junto todas as unidades desse município.`)) return;
+    try { await excluirMunicipio(m.id); await onMudou(); }
+    catch (err) { setErro(err.message || String(err)); }
+  }
+
   return (
     <div className="gerenciar-bloco">
       <h3>Municípios</h3>
       {municipios.length === 0 ? <p className="sub">Nenhum ainda.</p> : (
         <ul className="lista-simples">
-          {municipios.map((m) => <li key={m.id}>{m.nome}{m.uf ? ` (${m.uf})` : ''}</li>)}
+          {municipios.map((m) => editandoId === m.id ? (
+            <li key={m.id}>
+              <ItemEditorMunicipio municipio={m} onSalvo={() => { setEditandoId(null); onMudou(); }} onCancelar={() => setEditandoId(null)} />
+            </li>
+          ) : (
+            <li key={m.id}>
+              <span>{m.nome}{m.uf ? ` (${m.uf})` : ''}</span>
+              <span className="acoes-item">
+                <button type="button" className="link" onClick={() => setEditandoId(m.id)}>editar</button>
+                <button type="button" className="link link-perigo" onClick={() => excluir(m)}>excluir</button>
+              </span>
+            </li>
+          ))}
         </ul>
       )}
       <form className="form-linha form-linha-compacta" onSubmit={enviar}>
@@ -257,12 +321,37 @@ function BlocoMunicipios({ institutoId, municipios, onMudou }) {
   );
 }
 
+function ItemEditorMunicipio({ municipio, onSalvo, onCancelar }) {
+  const [nome, setNome] = useState(municipio.nome);
+  const [uf, setUf] = useState(municipio.uf || '');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  async function salvar(e) {
+    e.preventDefault();
+    setEnviando(true); setErro('');
+    try { await atualizarMunicipio(municipio.id, { nome: nome.trim(), uf: uf.trim().toUpperCase() }); onSalvo(); }
+    catch (err) { setErro(err.message || String(err)); setEnviando(false); }
+  }
+
+  return (
+    <form className="form-linha form-linha-compacta form-linha-edicao" onSubmit={salvar}>
+      <input value={nome} onChange={(e) => setNome(e.target.value)} required />
+      <input className="form-uf" value={uf} onChange={(e) => setUf(e.target.value)} maxLength={2} />
+      <button className="btn ghost" disabled={enviando}>Salvar</button>
+      <button type="button" className="link" onClick={onCancelar}>cancelar</button>
+      {erro && <p className="erro">{erro}</p>}
+    </form>
+  );
+}
+
 function BlocoUnidades({ institutoId, municipios, unidades, onMudou }) {
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState('');
   const [municipioId, setMunicipioId] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
+  const [editandoId, setEditandoId] = useState(null);
 
   async function enviar(e) {
     e.preventDefault();
@@ -273,6 +362,12 @@ function BlocoUnidades({ institutoId, municipios, unidades, onMudou }) {
       await onMudou();
     } catch (err) { setErro(err.message || String(err)); }
     finally { setEnviando(false); }
+  }
+
+  async function excluir(u) {
+    if (!window.confirm(`Excluir "${u.nome}"? Respostas já registradas nessa unidade não são apagadas.`)) return;
+    try { await excluirUnidade(u.id); await onMudou(); }
+    catch (err) { setErro(err.message || String(err)); }
   }
 
   if (municipios.length === 0) {
@@ -289,7 +384,20 @@ function BlocoUnidades({ institutoId, municipios, unidades, onMudou }) {
       <h3>Unidades</h3>
       {unidades.length === 0 ? <p className="sub">Nenhuma ainda.</p> : (
         <ul className="lista-simples">
-          {unidades.map((u) => <li key={u.id}>{u.nome}{u.tipo ? ` — ${u.tipo}` : ''}</li>)}
+          {unidades.map((u) => editandoId === u.id ? (
+            <li key={u.id}>
+              <ItemEditorUnidade unidade={u} municipios={municipios}
+                onSalvo={() => { setEditandoId(null); onMudou(); }} onCancelar={() => setEditandoId(null)} />
+            </li>
+          ) : (
+            <li key={u.id}>
+              <span>{u.nome}{u.tipo ? ` — ${u.tipo}` : ''}</span>
+              <span className="acoes-item">
+                <button type="button" className="link" onClick={() => setEditandoId(u.id)}>editar</button>
+                <button type="button" className="link link-perigo" onClick={() => excluir(u)}>excluir</button>
+              </span>
+            </li>
+          ))}
         </ul>
       )}
       <form className="form-linha form-linha-compacta" onSubmit={enviar}>
@@ -315,6 +423,34 @@ function BlocoUnidades({ institutoId, municipios, unidades, onMudou }) {
   );
 }
 
+function ItemEditorUnidade({ unidade, municipios, onSalvo, onCancelar }) {
+  const [nome, setNome] = useState(unidade.nome);
+  const [tipo, setTipo] = useState(unidade.tipo || '');
+  const [municipioId, setMunicipioId] = useState(unidade.municipio_id);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  async function salvar(e) {
+    e.preventDefault();
+    setEnviando(true); setErro('');
+    try { await atualizarUnidade(unidade.id, { nome: nome.trim(), tipo: tipo.trim(), municipio_id: municipioId }); onSalvo(); }
+    catch (err) { setErro(err.message || String(err)); setEnviando(false); }
+  }
+
+  return (
+    <form className="form-linha form-linha-compacta form-linha-edicao" onSubmit={salvar}>
+      <input value={nome} onChange={(e) => setNome(e.target.value)} required />
+      <input value={tipo} onChange={(e) => setTipo(e.target.value)} placeholder="Tipo" />
+      <select value={municipioId} onChange={(e) => setMunicipioId(e.target.value)} required>
+        {municipios.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+      </select>
+      <button className="btn ghost" disabled={enviando}>Salvar</button>
+      <button type="button" className="link" onClick={onCancelar}>cancelar</button>
+      {erro && <p className="erro">{erro}</p>}
+    </form>
+  );
+}
+
 function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
   const [criandoModelo, setCriandoModelo] = useState(false);
   const [erro, setErro] = useState('');
@@ -328,7 +464,14 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
     finally { setCriandoModelo(false); }
   }
 
+  const [editandoId, setEditandoId] = useState(null);
   const modelo = modelos[0]; // um instituto começa com 1 questionário ativo
+
+  async function excluir(p) {
+    if (!window.confirm(`Excluir a pergunta "${p.texto}"? Respostas já dadas mantêm a nota, só perdem o vínculo com o texto da pergunta.`)) return;
+    try { await excluirPergunta(p.id); await onMudou(); }
+    catch (err) { setErro(err.message || String(err)); }
+  }
 
   if (!modelo) {
     return (
@@ -348,13 +491,58 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
       <h3>Questionário — {modelo.nome}</h3>
       {perguntas.length === 0 ? <p className="sub">Nenhuma pergunta ainda.</p> : (
         <ol className="lista-simples">
-          {perguntas.map((p) => (
-            <li key={p.id}>{p.texto} <span className="sub">({TIPOS_PERGUNTA.find((t) => t.v === p.tipo)?.label})</span></li>
+          {perguntas.map((p) => editandoId === p.id ? (
+            <li key={p.id}>
+              <ItemEditorPergunta pergunta={p} onSalvo={() => { setEditandoId(null); onMudou(); }} onCancelar={() => setEditandoId(null)} />
+            </li>
+          ) : (
+            <li key={p.id}>
+              <span>{p.texto} <span className="sub">({TIPOS_PERGUNTA.find((t) => t.v === p.tipo)?.label})</span></span>
+              <span className="acoes-item">
+                <button type="button" className="link" onClick={() => setEditandoId(p.id)}>editar</button>
+                <button type="button" className="link link-perigo" onClick={() => excluir(p)}>excluir</button>
+              </span>
+            </li>
           ))}
         </ol>
       )}
       <FormNovaPergunta institutoId={institutoId} modeloId={modelo.id} proximaOrdem={perguntas.length + 1} onMudou={onMudou} />
     </div>
+  );
+}
+
+function ItemEditorPergunta({ pergunta, onSalvo, onCancelar }) {
+  const [texto, setTexto] = useState(pergunta.texto);
+  const [tipo, setTipo] = useState(pergunta.tipo);
+  const [obrigatoria, setObrigatoria] = useState(pergunta.obrigatoria);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  async function salvar(e) {
+    e.preventDefault();
+    setEnviando(true); setErro('');
+    try {
+      await atualizarPergunta(pergunta.id, { texto: texto.trim(), tipo, obrigatoria: tipo === 'texto' ? false : obrigatoria });
+      onSalvo();
+    } catch (err) { setErro(err.message || String(err)); setEnviando(false); }
+  }
+
+  return (
+    <form className="form-linha form-linha-compacta form-linha-edicao" onSubmit={salvar}>
+      <input value={texto} onChange={(e) => setTexto(e.target.value)} required />
+      <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+        {TIPOS_PERGUNTA.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
+      </select>
+      {tipo !== 'texto' && (
+        <label className="form-checkbox">
+          <input type="checkbox" checked={obrigatoria} onChange={(e) => setObrigatoria(e.target.checked)} />
+          Obrigatória
+        </label>
+      )}
+      <button className="btn ghost" disabled={enviando}>Salvar</button>
+      <button type="button" className="link" onClick={onCancelar}>cancelar</button>
+      {erro && <p className="erro">{erro}</p>}
+    </form>
   );
 }
 
