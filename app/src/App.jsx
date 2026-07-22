@@ -3,16 +3,19 @@ import { supabase } from './lib/supabase';
 import { sessaoAtiva, parear } from './lib/isv';
 import ColetaTotem from './ColetaTotem';
 import PainelAdmin from './PainelAdmin';
+import PainelOperador from './PainelOperador';
 
 /* Portão único de entrada: uma sessão (Supabase Auth) já resolve pra sempre
    quem é quem — o papel em usuario_perfil (ver db/01_schema.sql) diz se é
-   'totem' (vai pra coleta) ou admin (vai pro painel). Como a sessão persiste
-   no localStorage do aparelho/navegador, a escolha (admin vs totem) e o login
-   ou pareamento só aparecem na PRIMEIRA vez — nas próximas cargas, avaliar()
-   já acha a sessão e manda direto pra tela certa. */
+   'totem' (vai pra coleta), 'admin' (super-admin cross-instituto, o dono do
+   SaaS — vai pro painel de operador) ou admin de um instituto específico
+   (vai pro painel normal). Como a sessão persiste no localStorage do
+   aparelho/navegador, a escolha (admin vs totem) e o login ou pareamento só
+   aparecem na PRIMEIRA vez — nas próximas cargas, avaliar() já acha a sessão
+   e manda direto pra tela certa. */
 export default function App() {
   const [estado, setEstado] = useState('carregando');
-  // carregando | escolha | login-admin | parear | coleta | painel | erro
+  // carregando | escolha | login-admin | parear | coleta | painel | operador | erro
   const [erro, setErro] = useState('');
 
   async function avaliar() {
@@ -31,7 +34,7 @@ export default function App() {
         throw new Error('Sua conta não tem um perfil configurado neste instituto. Fale com o TI.');
       }
 
-      setEstado(perfil.papel === 'totem' ? 'coleta' : 'painel');
+      setEstado(perfil.papel === 'totem' ? 'coleta' : perfil.papel === 'admin' ? 'operador' : 'painel');
     } catch (e) {
       setErro(e.message || String(e));
       setEstado('erro');
@@ -84,6 +87,7 @@ export default function App() {
 
   if (estado === 'coleta') return <div className="v-coleta"><ColetaTotem /></div>;
   if (estado === 'painel') return <div className="v-painel"><PainelAdmin /></div>;
+  if (estado === 'operador') return <div className="v-painel"><PainelOperador /></div>;
   return null;
 }
 

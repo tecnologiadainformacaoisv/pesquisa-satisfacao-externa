@@ -206,3 +206,12 @@ h1,h2{ font-family:var(--font-dp); letter-spacing:-.015em; margin:0; }
   padding:13px 15px; display:flex; flex-direction:column; gap:6px; }
 .v-painel .ctxt{ margin:0; font-size:.88rem; color:var(--ink); line-height:1.45; }
 .v-painel .cmeta{ font-size:.72rem; color:var(--muted); }
+
+/* tabela (visão do operador — por instituto) */
+.v-painel .tabela-wrap{ overflow-x:auto; }
+.v-painel .tabela{ width:100%; border-collapse:collapse; font-size:.88rem; }
+.v-painel .tabela th{ text-align:left; font-size:.74rem; font-weight:700; letter-spacing:.05em;
+  text-transform:uppercase; color:var(--muted); padding:0 12px 10px; border-bottom:1px solid var(--line); }
+.v-painel .tabela td{ padding:12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.v-painel .tabela tbody tr:last-child td{ border-bottom:none; }
+.v-painel .tabela .chip{ display:inline-block; margin-right:8px; vertical-align:middle; }
