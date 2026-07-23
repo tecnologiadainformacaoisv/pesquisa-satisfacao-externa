@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 /* Todas as leituras passam pela RLS: o gestor só enxerga o próprio instituto. */
 
 export async function carregarTudo() {
-  const [instituto, unidades, nps, satisfacao, distribuicao, comentarios] = await Promise.all([
+  const [instituto, unidades, nps, satisfacao, distribuicao, comentarios, npsTurno, npsFaixaEtaria] = await Promise.all([
     supabase.from('instituto').select('id, nome').single().then((r) => r.data),
     supabase.from('unidade').select('id, nome, ativo').order('nome').then((r) => r.data || []),
     supabase.from('vw_nps_unidade_mes')
@@ -16,8 +16,12 @@ export async function carregarTudo() {
       .select('pergunta_id, pergunta, tipo, nota, quantidade').then((r) => r.data || []),
     supabase.from('vw_comentarios')
       .select('unidade_id, unidade_nome, criado_em, comentario').limit(50).then((r) => r.data || []),
+    supabase.from('vw_nps_turno')
+      .select('turno, total, promotores, neutros, detratores, nps').then((r) => r.data || []),
+    supabase.from('vw_nps_faixa_etaria')
+      .select('faixa_etaria, total, promotores, neutros, detratores, nps').then((r) => r.data || []),
   ]);
-  return { instituto, unidades, nps, satisfacao, distribuicao, comentarios };
+  return { instituto, unidades, nps, satisfacao, distribuicao, comentarios, npsTurno, npsFaixaEtaria };
 }
 
 // --------- agregações no cliente (filtro por unidade) ---------
@@ -69,6 +73,23 @@ export function satisfacaoPorMes(satisfacao, unidadeId) {
   return [...m.values()]
     .sort((a, b) => a.mes.localeCompare(b.mes))
     .map((a) => ({ mes: a.mes, indice: a.itens ? Math.round((a.sat / a.itens) * 1000) / 10 : 0 }));
+}
+
+const ROTULO_TURNO = { dia: 'Dia (6h–18h)', noite: 'Noite (18h–6h)' };
+const ORDEM_FAIXA_ETARIA = ['0 a 14 anos', '15 a 22 anos', '23 a 35 anos', '36 a 55 anos', 'Acima de 56 anos'];
+
+/** NPS por turno (dia/noite) — respostas sem turno registrado ficam fora. */
+export function npsPorTurno(npsTurno) {
+  return [...npsTurno]
+    .sort((a, b) => (a.turno === 'dia' ? -1 : 1) - (b.turno === 'dia' ? -1 : 1))
+    .map((r) => ({ turno: r.turno, rotulo: ROTULO_TURNO[r.turno] || r.turno, total: Number(r.total) || 0, nps: Number(r.nps) || 0 }));
+}
+
+/** NPS por faixa etária — só quem informou (pergunta é pulável). */
+export function npsPorFaixaEtaria(npsFaixaEtaria) {
+  return [...npsFaixaEtaria]
+    .sort((a, b) => ORDEM_FAIXA_ETARIA.indexOf(a.faixa_etaria) - ORDEM_FAIXA_ETARIA.indexOf(b.faixa_etaria))
+    .map((r) => ({ faixa: r.faixa_etaria, total: Number(r.total) || 0, nps: Number(r.nps) || 0 }));
 }
 
 /** Média por pergunta (só perguntas com nota). */

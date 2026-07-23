@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 import {
   carregarTudo, resumo, npsPorUnidade, satisfacaoPorMes, mediaPorPergunta,
+  npsPorTurno, npsPorFaixaEtaria,
 } from './lib/dados';
 
 const COR = { det: '#A63A30', neu: '#DE8038', prom: '#0C6036', acento: '#0B6E63' };
@@ -99,6 +100,22 @@ export default function PainelAdmin() {
                 rot: p.pergunta, valor: (p.media / p.max) * 100,
                 texto: `${p.media.toFixed(1)}`, sub: `de ${p.max} · ${p.n} resp.`,
                 min: 0, max: 100, cor: COR.acento,
+              }))} />
+            </Card>
+
+            {/* NPS por turno */}
+            <Card titulo="NPS por turno" sub="Respostas coletadas de dia ou à noite">
+              <BarrasH itens={npsPorTurno(dados.npsTurno).map((t) => ({
+                rot: t.rotulo, valor: t.nps, texto: `${t.nps}`, sub: `${t.total} resp.`,
+                min: -100, max: 100, cor: corNps(t.nps),
+              }))} />
+            </Card>
+
+            {/* NPS por faixa etária */}
+            <Card titulo="NPS por faixa etária" sub="Só de quem informou a idade (pergunta opcional)">
+              <BarrasH itens={npsPorFaixaEtaria(dados.npsFaixaEtaria).map((f) => ({
+                rot: f.faixa, valor: f.nps, texto: `${f.nps}`, sub: `${f.total} resp.`,
+                min: -100, max: 100, cor: corNps(f.nps),
               }))} />
             </Card>
 
