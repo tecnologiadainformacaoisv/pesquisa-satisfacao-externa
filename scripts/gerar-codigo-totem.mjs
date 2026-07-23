@@ -1,7 +1,7 @@
 /* Gera um código de pareamento de uso único para um tablet do totem.
    O TI digita este código, uma vez, direto no aparelho — nenhuma
    credencial fica salva no código-fonte ou no bundle do app.
-   Uso: node produto-isv/scripts/gerar-codigo-totem.mjs "UBS Centro" [minutos=30] */
+   Uso: node produto-isv/scripts/gerar-codigo-totem.mjs "UBS Centro" [minutos=30] [slug-do-instituto=isv] */
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -20,14 +20,15 @@ if (!URL || !KEY) { console.error('ERRO: preencha SUPABASE_URL e SUPABASE_SERVIC
 
 const UNIDADE = process.argv[2] || 'UBS Centro';
 const MINUTOS = Number(process.argv[3]) || 30;
+const SLUG = process.argv[4] || 'isv';
 
 const h = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 const rest = (path) => fetch(`${URL}/rest/v1/${path}`, { headers: h }).then((r) => r.json());
 
-const [inst] = await rest('instituto?slug=eq.isv&select=id');
-if (!inst) { console.error('Instituto ISV não encontrado (rode 04_seed_exemplo.sql).'); process.exit(1); }
+const [inst] = await rest(`instituto?slug=eq.${encodeURIComponent(SLUG)}&select=id,nome`);
+if (!inst) { console.error(`Instituto "${SLUG}" não encontrado.`); process.exit(1); }
 const [uni] = await rest(`unidade?instituto_id=eq.${inst.id}&nome=eq.${encodeURIComponent(UNIDADE)}&select=id,nome`);
-if (!uni) { console.error(`Unidade "${UNIDADE}" não encontrada no ISV.`); process.exit(1); }
+if (!uni) { console.error(`Unidade "${UNIDADE}" não encontrada em "${inst.nome}".`); process.exit(1); }
 
 // alfabeto sem 0/O/1/I/L — evita confusão de quem vai digitar na tela
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -52,6 +53,7 @@ if (!criado) { console.error('Não foi possível gerar um código único, tente 
 console.log('\n===================================================');
 console.log(' CÓDIGO DE PAREAMENTO DO TOTEM');
 console.log('---------------------------------------------------');
+console.log(' Instituto:', inst.nome);
 console.log(' Unidade :', uni.nome);
 console.log(' Código  :', codigo);
 console.log(' Válido  :', MINUTOS, 'minutos (uso único)');
