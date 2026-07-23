@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 
 export async function carregarTudo() {
   const [instituto, unidades, nps, satisfacao, distribuicao, comentarios, npsTurno, npsFaixaEtaria] = await Promise.all([
-    supabase.from('instituto').select('id, nome').single().then((r) => r.data),
+    supabase.from('instituto').select('id, nome, cor_acento, logo_url').single().then((r) => r.data),
     supabase.from('unidade').select('id, nome, ativo').order('nome').then((r) => r.data || []),
     supabase.from('vw_nps_unidade_mes')
       .select('unidade_id, unidade_nome, mes, total, promotores, neutros, detratores, nps')

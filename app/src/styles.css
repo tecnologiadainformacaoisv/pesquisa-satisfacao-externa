@@ -52,7 +52,8 @@ h1,h2{ font-family:var(--font-dp); letter-spacing:-.015em; margin:0; }
 .erro{ color:var(--bad); font-size:.9rem; max-width:60ch; }
 
 .btn{ border:none; background:var(--accent); color:#fff; font-size:1.02rem; font-weight:650;
-  padding:14px 30px; border-radius:12px; transition:background .12s, opacity .12s; }
+  padding:14px 30px; border-radius:12px; transition:background .12s, opacity .12s; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; }
 .btn:hover{ background:var(--accent-d); }
 .btn:disabled{ opacity:.4; cursor:not-allowed; }
 .btn.ghost{ background:transparent; color:var(--ink-2); border:1.5px solid var(--line-2); }
@@ -67,6 +68,7 @@ h1,h2{ font-family:var(--font-dp); letter-spacing:-.015em; margin:0; }
 .marca-mark{ width:40px; height:40px; border-radius:9px; background:var(--accent); color:#fff;
   display:grid; place-items:center; font-family:var(--font-dp); font-weight:700; font-size:.85rem; }
 .marca-mark.grande{ width:64px; height:64px; font-size:1.1rem; }
+.marca-logo{ object-fit:contain; background:var(--surface); padding:3px; }
 .marca-txt{ display:flex; flex-direction:column; line-height:1.2; }
 .marca-n{ font-family:var(--font-dp); font-weight:650; font-size:1rem; }
 .marca-s{ font-size:.8rem; color:var(--muted); }
@@ -162,6 +164,10 @@ h1,h2{ font-family:var(--font-dp); letter-spacing:-.015em; margin:0; }
   padding:18px 0; border-bottom:1px solid var(--line); margin-bottom:22px; flex-wrap:wrap; }
 .v-painel .mark{ width:38px; height:38px; border-radius:9px; background:var(--accent); color:#fff;
   display:grid; place-items:center; font-family:var(--font-dp); font-weight:700; font-size:.8rem; }
+.v-painel .mark-logo{ object-fit:contain; background:var(--surface); padding:2px; }
+.v-painel .logo-atual{ width:38px; height:38px; border-radius:9px; object-fit:contain;
+  background:var(--surface); border:1px solid var(--line); }
+.v-painel .form-logo{ display:flex; align-items:center; gap:10px; }
 .v-painel .mtxt{ display:flex; flex-direction:column; line-height:1.25; }
 .v-painel .mn{ font-family:var(--font-dp); font-weight:650; font-size:1rem; }
 .v-painel .ms{ font-size:.76rem; color:var(--muted); }

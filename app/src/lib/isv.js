@@ -44,7 +44,7 @@ export async function carregarConfig() {
   if (ep) throw new Error('Perfil do totem não encontrado: ' + ep.message);
 
   const { data: instituto } = await supabase
-    .from('instituto').select('id, nome, cor_acento').single();
+    .from('instituto').select('id, nome, cor_acento, logo_url').single();
 
   const { data: unidade } = await supabase
     .from('unidade').select('id, nome').eq('id', perfil.unidade_id).single();

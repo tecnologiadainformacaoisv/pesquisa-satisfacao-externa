@@ -5,8 +5,9 @@ import {
   carregarDetalhesInstituto, criarMunicipio, atualizarMunicipio, excluirMunicipio,
   criarUnidade, atualizarUnidade, excluirUnidade,
   criarModeloPesquisa, criarPergunta, atualizarPergunta, excluirPergunta, reordenarPerguntas,
-  atualizarColetaDemografia,
+  atualizarColetaDemografia, uploadLogo,
 } from './lib/operador';
+import { iniciais } from './lib/marca';
 
 const TIPOS_PERGUNTA = [
   { v: 'nps', label: 'NPS (nota 0–10)' },
@@ -240,6 +241,7 @@ function EditorInstituto({ instituto, onMudou }) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState(false);
+  const [enviandoLogo, setEnviandoLogo] = useState(false);
 
   // troca de instituto selecionado no dropdown -> recomeça os campos
   useEffect(() => { setNome(instituto.nome); setCor(instituto.cor_acento || '#0B6E63'); setOk(false); }, [instituto.id]);
@@ -255,20 +257,42 @@ function EditorInstituto({ instituto, onMudou }) {
     finally { setEnviando(false); }
   }
 
+  async function mudarLogo(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite escolher o mesmo arquivo de novo depois
+    if (!file) return;
+    setEnviandoLogo(true); setErro('');
+    try { await uploadLogo(instituto.id, file); await onMudou(); }
+    catch (err) { setErro(err.message || String(err)); }
+    finally { setEnviandoLogo(false); }
+  }
+
   return (
-    <form className="form-linha form-linha-compacta" onSubmit={salvar}>
-      <label>
-        Nome do instituto
-        <input value={nome} onChange={(e) => setNome(e.target.value)} required />
-      </label>
-      <label className="form-cor">
-        Cor
-        <input type="color" value={cor} onChange={(e) => setCor(e.target.value)} />
-      </label>
-      <button className="btn ghost" disabled={enviando}>{enviando ? 'Salvando…' : 'Salvar instituto'}</button>
-      {ok && <span className="sub" style={{ color: 'var(--good)' }}>Salvo.</span>}
-      {erro && <p className="erro">{erro}</p>}
-    </form>
+    <>
+      <form className="form-linha form-linha-compacta" onSubmit={salvar}>
+        <label>
+          Nome do instituto
+          <input value={nome} onChange={(e) => setNome(e.target.value)} required />
+        </label>
+        <label className="form-cor">
+          Cor
+          <input type="color" value={cor} onChange={(e) => setCor(e.target.value)} />
+        </label>
+        <button className="btn ghost" disabled={enviando}>{enviando ? 'Salvando…' : 'Salvar instituto'}</button>
+        {ok && <span className="sub" style={{ color: 'var(--good)' }}>Salvo.</span>}
+        {erro && <p className="erro">{erro}</p>}
+      </form>
+      <div className="form-logo">
+        {instituto.logo_url
+          ? <img className="logo-atual" src={instituto.logo_url} alt="" />
+          : <div className="mark">{iniciais(instituto.nome)}</div>}
+        <label className="btn ghost">
+          {enviandoLogo ? 'Enviando…' : 'Trocar logo'}
+          <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden
+                 disabled={enviandoLogo} onChange={mudarLogo} />
+        </label>
+      </div>
+    </>
   );
 }
 

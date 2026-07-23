@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   carregarConfig, enviar, enfileirar, tentarEnviarFila, pendentes, turnoAtual,
 } from './lib/isv';
+import { iniciais, estiloAcento } from './lib/marca';
 
 const NPS = Array.from({ length: 11 }, (_, i) => i);
 const ESTRELAS = [1, 2, 3, 4, 5];
@@ -113,7 +114,7 @@ export default function ColetaTotem() {
   );
 
   if (fase === 'demografia') return (
-    <div className="tela">
+    <div className="tela" style={estiloAcento(cfg.instituto?.cor_acento)}>
       <main className="conteudo">
         <div className="ask">
           <div className="ask-q">Qual a sua idade?</div>
@@ -132,10 +133,10 @@ export default function ColetaTotem() {
     </div>
   );
 
-  if (fase === 'enviando') return <Centro><div className="spinner" /><p>Enviando…</p></Centro>;
+  if (fase === 'enviando') return <Centro style={estiloAcento(cfg.instituto?.cor_acento)}><div className="spinner" /><p>Enviando…</p></Centro>;
 
   if (fase === 'obrigado') return (
-    <Centro>
+    <Centro style={estiloAcento(cfg.instituto?.cor_acento)}>
       <div className="check">✓</div>
       <h1 className="ask-q">Obrigado por participar!</h1>
       <p className="ask-s">
@@ -148,10 +149,12 @@ export default function ColetaTotem() {
 
   // ---------- Formulário ----------
   return (
-    <div className="tela">
+    <div className="tela" style={estiloAcento(cfg.instituto?.cor_acento)}>
       <header className="topo">
         <div className="marca">
-          <div className="marca-mark">ISV</div>
+          {cfg.instituto?.logo_url
+            ? <img className="marca-mark marca-logo" src={cfg.instituto.logo_url} alt="" />
+            : <div className="marca-mark">{iniciais(cfg.instituto?.nome)}</div>}
           <div className="marca-txt">
             <span className="marca-n">{cfg.instituto?.nome || 'Instituto São Vicente'}</span>
             <span className="marca-s">{cfg.unidade?.nome}</span>
@@ -228,7 +231,7 @@ export default function ColetaTotem() {
 }
 
 // ---------- auxiliares ----------
-function Centro({ children }) { return <div className="tela centro">{children}</div>; }
+function Centro({ children, style }) { return <div className="tela centro" style={style}>{children}</div>; }
 
 function legenda(tipo) {
   if (tipo === 'nps') return 'Toque em uma nota de 0 a 10.';

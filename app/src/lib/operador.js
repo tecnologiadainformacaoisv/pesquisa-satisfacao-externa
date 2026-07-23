@@ -8,7 +8,7 @@ import { supabase } from './supabase';
 
 export async function carregarVisaoGeral() {
   const [institutos, municipios, unidades, nps, satisfacao] = await Promise.all([
-    supabase.from('instituto').select('id, nome, cor_acento').order('nome').then((r) => r.data || []),
+    supabase.from('instituto').select('id, nome, cor_acento, logo_url').order('nome').then((r) => r.data || []),
     supabase.from('municipio').select('id, instituto_id').then((r) => r.data || []),
     supabase.from('unidade').select('id, instituto_id, ativo').then((r) => r.data || []),
     supabase.from('vw_nps_unidade_mes').select('instituto_id, total, promotores, neutros, detratores').then((r) => r.data || []),
@@ -85,7 +85,27 @@ export async function criarInstituto({ nome, slug, cor }) {
 
 export async function atualizarInstituto(id, { nome, cor }) {
   const { data, error } = await supabase.from('instituto')
-    .update({ nome, cor_acento: cor }).eq('id', id).select('id, nome, cor_acento').single();
+    .update({ nome, cor_acento: cor }).eq('id', id).select('id, nome, cor_acento, logo_url').single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/* Bucket "logos" (público pra leitura, db/17_branding_publico.sql) —
+   caminho por instituto_id garante que a policy de escrita (só
+   is_super_admin ou o admin_instituto dono da pasta) se aplique.
+   upsert:true porque o instituto pode trocar o logo depois; o "?t="
+   no fim evita que o navegador mostre o logo antigo em cache. */
+export async function uploadLogo(institutoId, file) {
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+  const caminho = `${institutoId}/logo.${ext}`;
+  const { error: eUp } = await supabase.storage.from('logos').upload(caminho, file, { upsert: true });
+  if (eUp) throw new Error(eUp.message);
+
+  const { data: pub } = supabase.storage.from('logos').getPublicUrl(caminho);
+  const logo_url = `${pub.publicUrl}?t=${Date.now()}`;
+
+  const { data, error } = await supabase.from('instituto')
+    .update({ logo_url }).eq('id', institutoId).select('id, nome, cor_acento, logo_url').single();
   if (error) throw new Error(error.message);
   return data;
 }

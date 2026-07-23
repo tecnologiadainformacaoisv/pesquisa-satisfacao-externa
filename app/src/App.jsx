@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 import { sessaoAtiva, parear } from './lib/isv';
+import { iniciais, estiloAcento, institutoPublicoPorSlug } from './lib/marca';
 import ColetaTotem from './ColetaTotem';
 import PainelAdmin from './PainelAdmin';
 import PainelOperador from './PainelOperador';
@@ -17,6 +18,15 @@ export default function App() {
   const [estado, setEstado] = useState('carregando');
   // carregando | escolha | login-admin | parear | coleta | painel | operador | erro
   const [erro, setErro] = useState('');
+  // Link direto por instituto (?i=slug) — mostra a marca dele na tela de
+  // entrada antes do login, sem precisar de subdomínio de verdade (ver
+  // db/17_branding_publico.sql e a decisão registrada em 23/07/2026).
+  const [marca, setMarca] = useState(null);
+
+  useEffect(() => {
+    const slug = new URLSearchParams(location.search).get('i');
+    if (slug) institutoPublicoPorSlug(slug).then(setMarca).catch(() => {});
+  }, []);
 
   async function avaliar() {
     setEstado('carregando');
@@ -68,11 +78,11 @@ export default function App() {
   if (estado === 'carregando') return <Centro><div className="spinner" /></Centro>;
 
   if (estado === 'escolha') return (
-    <TelaEscolha onAdmin={() => setEstado('login-admin')} onTotem={escolherTotem} />
+    <TelaEscolha marca={marca} onAdmin={() => setEstado('login-admin')} onTotem={escolherTotem} />
   );
 
   if (estado === 'login-admin') return (
-    <TelaLoginAdmin onVoltar={() => setEstado('escolha')} onEntrar={avaliar} />
+    <TelaLoginAdmin marca={marca} onVoltar={() => setEstado('escolha')} onEntrar={avaliar} />
   );
 
   if (estado === 'parear') return <TelaPareamento onConfirmar={confirmarPareamento} />;
@@ -93,13 +103,15 @@ export default function App() {
 
 /* ---------------- telas do portão ---------------- */
 
-function Centro({ children }) { return <div className="v-gate tela centro">{children}</div>; }
+function Centro({ children, style }) { return <div className="v-gate tela centro" style={style}>{children}</div>; }
 
-function TelaEscolha({ onAdmin, onTotem }) {
+function TelaEscolha({ marca, onAdmin, onTotem }) {
   return (
-    <Centro>
-      <div className="marca-mark grande">ISV</div>
-      <h1 className="ask-q">Pesquisa de Satisfação</h1>
+    <Centro style={estiloAcento(marca?.cor_acento)}>
+      {marca?.logo_url
+        ? <img className="marca-mark grande marca-logo" src={marca.logo_url} alt="" />
+        : <div className="marca-mark grande">{iniciais(marca?.nome)}</div>}
+      <h1 className="ask-q">{marca?.nome || 'Pesquisa de Satisfação'}</h1>
       <p className="ask-s">Como você vai entrar?</p>
       <div className="escolha-botoes">
         <button className="btn" onClick={onAdmin}>Sou administrador</button>
@@ -109,7 +121,7 @@ function TelaEscolha({ onAdmin, onTotem }) {
   );
 }
 
-function TelaLoginAdmin({ onVoltar, onEntrar }) {
+function TelaLoginAdmin({ marca, onVoltar, onEntrar }) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
@@ -124,11 +136,13 @@ function TelaLoginAdmin({ onVoltar, onEntrar }) {
   }
 
   return (
-    <div className="v-gate login-tela">
+    <div className="v-gate login-tela" style={estiloAcento(marca?.cor_acento)}>
       <form className="login" onSubmit={entrar}>
-        <div className="marca-mark grande">ISV</div>
+        {marca?.logo_url
+          ? <img className="marca-mark grande marca-logo" src={marca.logo_url} alt="" />
+          : <div className="marca-mark grande">{iniciais(marca?.nome)}</div>}
         <h1>Painel de satisfação</h1>
-        <p className="ask-s">Entre com sua conta do instituto.</p>
+        <p className="ask-s">{marca?.nome ? `Entre com sua conta do ${marca.nome}.` : 'Entre com sua conta do instituto.'}</p>
         <input type="email" placeholder="E-mail" value={email} required
                onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
         <input type="password" placeholder="Senha" value={senha} required

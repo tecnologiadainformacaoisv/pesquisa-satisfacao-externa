@@ -4,6 +4,7 @@ import {
   carregarTudo, resumo, npsPorUnidade, satisfacaoPorMes, mediaPorPergunta,
   npsPorTurno, npsPorFaixaEtaria,
 } from './lib/dados';
+import { iniciais, estiloAcento } from './lib/marca';
 
 const COR = { det: '#A63A30', neu: '#DE8038', prom: '#0C6036', acento: '#0B6E63' };
 const mesRot = (iso) => {
@@ -31,10 +32,12 @@ export default function PainelAdmin() {
   const r = dados ? resumo(dados, filtro) : null;
 
   return (
-    <div className="app">
+    <div className="app" style={estiloAcento(dados?.instituto?.cor_acento)}>
       <header className="topo">
         <div className="marca">
-          <div className="mark">ISV</div>
+          {dados?.instituto?.logo_url
+            ? <img className="mark mark-logo" src={dados.instituto.logo_url} alt="" />
+            : <div className="mark">{iniciais(dados?.instituto?.nome)}</div>}
           <div className="mtxt">
             <span className="mn">{dados?.instituto?.nome || 'Instituto São Vicente'}</span>
             <span className="ms">Painel de satisfação</span>
