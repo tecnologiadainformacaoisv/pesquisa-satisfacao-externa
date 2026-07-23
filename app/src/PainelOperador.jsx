@@ -5,6 +5,7 @@ import {
   carregarDetalhesInstituto, criarMunicipio, atualizarMunicipio, excluirMunicipio,
   criarUnidade, atualizarUnidade, excluirUnidade,
   criarModeloPesquisa, criarPergunta, atualizarPergunta, excluirPergunta, reordenarPerguntas,
+  atualizarColetaDemografia,
 } from './lib/operador';
 
 const TIPOS_PERGUNTA = [
@@ -496,6 +497,11 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
     catch (err) { setErro(err.message || String(err)); }
   }
 
+  async function alternarDemografia(e) {
+    try { await atualizarColetaDemografia(modelo.id, e.target.checked); await onMudou(); }
+    catch (err) { setErro(err.message || String(err)); }
+  }
+
   if (!modelo) {
     return (
       <div className="gerenciar-bloco">
@@ -512,6 +518,10 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
   return (
     <div className="gerenciar-bloco">
       <h3>Questionário — {modelo.nome}</h3>
+      <label className="form-checkbox">
+        <input type="checkbox" checked={!!modelo.coleta_demografia} onChange={alternarDemografia} />
+        Perguntar faixa etária ao coletar (opcional, pulável)
+      </label>
       {perguntas.length === 0 ? <p className="sub">Nenhuma pergunta ainda.</p> : (
         <>
           <p className="sub">Arraste pelo ⠿⠿ pra mudar a ordem.</p>

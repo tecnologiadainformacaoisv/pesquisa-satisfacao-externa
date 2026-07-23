@@ -100,7 +100,7 @@ export async function carregarDetalhesInstituto(institutoId) {
   const [municipios, unidades, modelos] = await Promise.all([
     supabase.from('municipio').select('id, nome, uf').eq('instituto_id', institutoId).order('nome').then((r) => r.data || []),
     supabase.from('unidade').select('id, nome, tipo, municipio_id').eq('instituto_id', institutoId).order('nome').then((r) => r.data || []),
-    supabase.from('modelo_pesquisa').select('id, nome, ativo').eq('instituto_id', institutoId).order('criado_em').then((r) => r.data || []),
+    supabase.from('modelo_pesquisa').select('id, nome, ativo, coleta_demografia').eq('instituto_id', institutoId).order('criado_em').then((r) => r.data || []),
   ]);
   let perguntas = [];
   if (modelos.length) {
@@ -156,6 +156,15 @@ export async function criarModeloPesquisa({ instituto_id, nome }) {
     .insert([{ instituto_id, nome, ativo: true }]).select('id, nome, ativo').single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+/* coleta_demografia liga/desliga a tela de faixa etária no totem (Fase 2
+   do plano) — ver ColetaTotem.jsx. Turno nunca passa por aqui: vem
+   sempre do relógio do aparelho, não é configurável. */
+export async function atualizarColetaDemografia(modeloId, ligado) {
+  const { error } = await supabase.from('modelo_pesquisa')
+    .update({ coleta_demografia: ligado }).eq('id', modeloId);
+  if (error) throw new Error(error.message);
 }
 
 export async function criarPergunta({ instituto_id, modelo_id, ordem, tipo, texto, obrigatoria }) {

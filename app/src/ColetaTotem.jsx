@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  carregarConfig, enviar, enfileirar, tentarEnviarFila, pendentes,
+  carregarConfig, enviar, enfileirar, tentarEnviarFila, pendentes, turnoAtual,
 } from './lib/isv';
 
 const NPS = Array.from({ length: 11 }, (_, i) => i);
@@ -12,24 +12,26 @@ const CARINHAS = [
   { v: 4, cor: '#479A52', rot: 'Muito bom' },
   { v: 5, cor: '#0C6036', rot: 'Excelente' },
 ];
+const FAIXAS_ETARIAS = ['0 a 14 anos', '15 a 22 anos', '23 a 35 anos', '36 a 55 anos', 'Acima de 56 anos'];
 
 /* Assume que quem chama já cuidou de sessão + pareamento (ver App.jsx) —
    este componente só carrega o questionário do instituto/unidade já
    resolvidos e grava as respostas. */
 export default function ColetaTotem() {
-  const [fase, setFase] = useState('carregando'); // carregando|erro|form|enviando|obrigado
+  const [fase, setFase] = useState('carregando'); // carregando|erro|demografia|form|enviando|obrigado
   const [erro, setErro] = useState('');
   const [cfg, setCfg] = useState(null);
   const [passo, setPasso] = useState(0);
   const [resp, setResp] = useState({});           // pergunta_id -> {valor_num|valor_texto}
   const [salvoOffline, setSalvoOffline] = useState(false);
   const [fila, setFila] = useState(0);
+  const [faixaEtaria, setFaixaEtaria] = useState(null);
 
   async function iniciar() {
     try {
       const c = await carregarConfig();
       setCfg(c);
-      setFase('form');
+      setFase(c.modelo.coleta_demografia ? 'demografia' : 'form');
       tentarEnviarFila().then(() => setFila(pendentes())).catch(() => {});
     } catch (e) {
       setErro(e.message || String(e));
@@ -78,6 +80,8 @@ export default function ColetaTotem() {
       unidade_id: cfg.unidade.id,
       modelo_id: cfg.modelo.id,
       itens,
+      faixa_etaria: faixaEtaria,
+      turno: turnoAtual(),
     };
     try {
       if (!navigator.onLine) throw new Error('offline');
@@ -92,7 +96,10 @@ export default function ColetaTotem() {
     setTimeout(reiniciar, 4000);
   }
 
-  const reiniciar = () => { setResp({}); setPasso(0); setSalvoOffline(false); setFase('form'); };
+  const reiniciar = () => {
+    setResp({}); setPasso(0); setSalvoOffline(false); setFaixaEtaria(null);
+    setFase(cfg.modelo.coleta_demografia ? 'demografia' : 'form'); // próxima pessoa, pergunta de novo
+  };
 
   // ---------- Telas de estado ----------
   if (fase === 'carregando') return <Centro><div className="spinner" /><p>Carregando…</p></Centro>;
@@ -103,6 +110,26 @@ export default function ColetaTotem() {
       <p className="erro">{erro}</p>
       <button className="btn" onClick={() => location.reload()}>Tentar de novo</button>
     </Centro>
+  );
+
+  if (fase === 'demografia') return (
+    <div className="tela">
+      <main className="conteudo">
+        <div className="ask">
+          <div className="ask-q">Qual a sua idade?</div>
+          <div className="ask-s">Só pra melhorar nossos relatórios — se preferir, pode pular.</div>
+        </div>
+        <div className="faixas">
+          {FAIXAS_ETARIAS.map((f) => (
+            <button key={f} className="btn" onClick={() => { setFaixaEtaria(f); setFase('form'); }}>{f}</button>
+          ))}
+        </div>
+      </main>
+      <footer className="rodape">
+        <span />
+        <button className="btn ghost" onClick={() => setFase('form')}>Pular</button>
+      </footer>
+    </div>
   );
 
   if (fase === 'enviando') return <Centro><div className="spinner" /><p>Enviando…</p></Centro>;

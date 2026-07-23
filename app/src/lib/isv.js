@@ -50,7 +50,7 @@ export async function carregarConfig() {
     .from('unidade').select('id, nome').eq('id', perfil.unidade_id).single();
 
   const { data: modelo, error: em } = await supabase
-    .from('modelo_pesquisa').select('id, nome')
+    .from('modelo_pesquisa').select('id, nome, coleta_demografia')
     .eq('ativo', true).order('criado_em', { ascending: true }).limit(1).single();
   if (em) throw new Error('Nenhum questionário ativo configurado para este instituto: ' + em.message);
 
@@ -62,11 +62,21 @@ export async function carregarConfig() {
   return { instituto, unidade, modelo, perguntas };
 }
 
+// -------- Demografia opcional (Fase 2) --------
+/* Turno nunca é perguntado — vem do relógio do próprio aparelho no
+   momento do envio, igual o mspesquisa original fazia. Faixa etária é
+   a única pergunta de fato (e só aparece se modelo.coleta_demografia
+   estiver ligado — ver ColetaTotem.jsx). */
+export function turnoAtual() {
+  const hora = new Date().getHours();
+  return (hora >= 6 && hora < 18) ? 'dia' : 'noite';
+}
+
 // -------- Gravação de uma resposta (+ itens) --------
-/* Vai tudo numa RPC (db/08): uma transação só, e o id é gerado AQUI.
-   Isso torna o reenvio da fila offline idempotente — mandar duas vezes
-   a mesma resposta não duplica métrica — e dispensa ler a linha de volta,
-   coisa que o totem não pode fazer. */
+/* Vai tudo numa RPC (db/08 + db/12), uma transação só, e o id é gerado
+   AQUI. Isso torna o reenvio da fila offline idempotente — mandar duas
+   vezes a mesma resposta não duplica métrica — e dispensa ler a linha
+   de volta, coisa que o totem não pode fazer. */
 export async function enviar(payload) {
   const id = payload.id || crypto.randomUUID();
 
@@ -81,6 +91,8 @@ export async function enviar(payload) {
       valor_num: it.valor_num ?? null,
       valor_texto: it.valor_texto ?? null,
     })),
+    p_faixa_etaria: payload.faixa_etaria ?? null,
+    p_turno: payload.turno ?? null,
   });
   if (error) throw error;
   return id;
