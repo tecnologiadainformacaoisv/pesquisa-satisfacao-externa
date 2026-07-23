@@ -4,7 +4,7 @@ import {
   carregarVisaoGeral, resumoPorInstituto, totaisGerais, criarInstituto, slugify, atualizarInstituto,
   carregarDetalhesInstituto, criarMunicipio, atualizarMunicipio, excluirMunicipio,
   criarUnidade, atualizarUnidade, excluirUnidade,
-  criarModeloPesquisa, criarPergunta, atualizarPergunta, excluirPergunta,
+  criarModeloPesquisa, criarPergunta, atualizarPergunta, excluirPergunta, reordenarPerguntas,
 } from './lib/operador';
 
 const TIPOS_PERGUNTA = [
@@ -475,11 +475,24 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
   }
 
   const [editandoId, setEditandoId] = useState(null);
+  const [arrastandoIdx, setArrastandoIdx] = useState(null);
+  const [sobreIdx, setSobreIdx] = useState(null);
   const modelo = modelos[0]; // um instituto começa com 1 questionário ativo
 
   async function excluir(p) {
     if (!window.confirm(`Excluir a pergunta "${p.texto}"? Respostas já dadas mantêm a nota, só perdem o vínculo com o texto da pergunta.`)) return;
     try { await excluirPergunta(p.id); await onMudou(); }
+    catch (err) { setErro(err.message || String(err)); }
+  }
+
+  async function soltarEm(indexDestino) {
+    const indexOrigem = arrastandoIdx;
+    setArrastandoIdx(null); setSobreIdx(null);
+    if (indexOrigem === null || indexOrigem === indexDestino) return;
+    const nova = [...perguntas];
+    const [item] = nova.splice(indexOrigem, 1);
+    nova.splice(indexDestino, 0, item);
+    try { await reordenarPerguntas(nova); await onMudou(); }
     catch (err) { setErro(err.message || String(err)); }
   }
 
@@ -500,21 +513,32 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
     <div className="gerenciar-bloco">
       <h3>Questionário — {modelo.nome}</h3>
       {perguntas.length === 0 ? <p className="sub">Nenhuma pergunta ainda.</p> : (
-        <ol className="lista-simples">
-          {perguntas.map((p) => editandoId === p.id ? (
-            <li key={p.id}>
-              <ItemEditorPergunta pergunta={p} onSalvo={() => { setEditandoId(null); onMudou(); }} onCancelar={() => setEditandoId(null)} />
-            </li>
-          ) : (
-            <li key={p.id}>
-              <span>{p.texto} <span className="sub">({TIPOS_PERGUNTA.find((t) => t.v === p.tipo)?.label})</span></span>
-              <span className="acoes-item">
-                <button type="button" className="link" onClick={() => setEditandoId(p.id)}>editar</button>
-                <button type="button" className="link link-perigo" onClick={() => excluir(p)}>excluir</button>
-              </span>
-            </li>
-          ))}
-        </ol>
+        <>
+          <p className="sub">Arraste pelo ⠿⠿ pra mudar a ordem.</p>
+          <ol className="lista-simples lista-arrastavel">
+            {perguntas.map((p, i) => editandoId === p.id ? (
+              <li key={p.id}>
+                <ItemEditorPergunta pergunta={p} onSalvo={() => { setEditandoId(null); onMudou(); }} onCancelar={() => setEditandoId(null)} />
+              </li>
+            ) : (
+              <li key={p.id}
+                  className={'item-arrastavel' + (arrastandoIdx === i ? ' arrastando' : '') + (sobreIdx === i ? ' sobre' : '')}
+                  draggable
+                  onDragStart={() => setArrastandoIdx(i)}
+                  onDragEnter={() => setSobreIdx(i)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDragEnd={() => { setArrastandoIdx(null); setSobreIdx(null); }}
+                  onDrop={(e) => { e.preventDefault(); soltarEm(i); }}>
+                <span className="alca-arrastar" title="Arrastar pra reordenar">⠿⠿</span>
+                <span className="item-texto">{p.texto} <span className="sub">({TIPOS_PERGUNTA.find((t) => t.v === p.tipo)?.label})</span></span>
+                <span className="acoes-item">
+                  <button type="button" className="link" onClick={() => setEditandoId(p.id)}>editar</button>
+                  <button type="button" className="link link-perigo" onClick={() => excluir(p)}>excluir</button>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </>
       )}
       <FormNovaPergunta institutoId={institutoId} modeloId={modelo.id} proximaOrdem={perguntas.length + 1} onMudou={onMudou} />
     </div>

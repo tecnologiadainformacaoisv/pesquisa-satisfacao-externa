@@ -173,6 +173,19 @@ export async function atualizarPergunta(id, { texto, tipo, obrigatoria }) {
   return data;
 }
 
+/* Reordenar (arrastar-e-soltar): o PostgREST não faz update em lote com
+   valor DIFERENTE por linha numa chamada só, então manda um PATCH por
+   pergunta cujo `ordem` mudou (list curta, tipicamente 3-6 perguntas). */
+export async function reordenarPerguntas(perguntasNaNovaOrdem) {
+  const mudancas = perguntasNaNovaOrdem
+    .map((p, i) => ({ id: p.id, ordem: i + 1 }))
+    .filter((p, i) => p.ordem !== perguntasNaNovaOrdem[i].ordem);
+  await Promise.all(mudancas.map(({ id, ordem }) =>
+    supabase.from('pergunta').update({ ordem }).eq('id', id).then(({ error }) => {
+      if (error) throw new Error(error.message);
+    })));
+}
+
 /* pergunta_id em resposta_item é "on delete set null" (db/01_schema.sql) —
    apagar uma pergunta NÃO apaga respostas já dadas, só desvincula o
    histórico daquela pergunta especifica (mantém tipo/valor). */

@@ -221,6 +221,16 @@ h1,h2{ font-family:var(--font-dp); letter-spacing:-.015em; margin:0; }
   background:var(--surface); border:1px solid var(--line-2); color:var(--ink);
   border-radius:8px; padding:8px 10px; font-size:.82rem; }
 
+/* arrastar-e-soltar (reordenar perguntas) */
+.v-painel .item-arrastavel{ cursor:grab; border-radius:8px; padding:6px 8px; margin:0 -8px;
+  transition:background .12s, opacity .12s; }
+.v-painel .item-arrastavel:active{ cursor:grabbing; }
+.v-painel .item-arrastavel.arrastando{ opacity:.4; }
+.v-painel .item-arrastavel.sobre{ background:var(--sunken); box-shadow:inset 0 2px 0 var(--accent); }
+.v-painel .alca-arrastar{ color:var(--line-2); font-size:.7rem; letter-spacing:-2px; flex-shrink:0;
+  cursor:grab; user-select:none; }
+.v-painel .item-texto{ flex:1; }
+
 .v-painel .kpi{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r);
   padding:18px 20px; display:flex; flex-direction:column; gap:3px; }
 .v-painel .kpi-r{ font-size:.74rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
