@@ -122,10 +122,13 @@ export async function carregarDetalhesInstituto(institutoId) {
     supabase.from('unidade').select('id, nome, tipo, municipio_id').eq('instituto_id', institutoId).order('nome').then((r) => r.data || []),
     supabase.from('modelo_pesquisa').select('id, nome, ativo, coleta_demografia').eq('instituto_id', institutoId).order('criado_em').then((r) => r.data || []),
   ]);
+  // Só as perguntas do questionário exibido (modelos[0]) — buscar de TODOS os
+  // modelos de uma vez fazia perguntas de mesmo texto aparecerem duplicadas na
+  // tela (o ISV era o único com 2 modelos; nos demais o bug ficava invisível).
   let perguntas = [];
   if (modelos.length) {
     perguntas = await supabase.from('pergunta').select('id, modelo_id, ordem, tipo, texto, obrigatoria')
-      .in('modelo_id', modelos.map((m) => m.id)).order('ordem').then((r) => r.data || []);
+      .eq('modelo_id', modelos[0].id).order('ordem').then((r) => r.data || []);
   }
   return { municipios, unidades, modelos, perguntas };
 }
@@ -184,6 +187,18 @@ export async function criarModeloPesquisa({ instituto_id, nome }) {
 export async function atualizarColetaDemografia(modeloId, ligado) {
   const { error } = await supabase.from('modelo_pesquisa')
     .update({ coleta_demografia: ligado }).eq('id', modeloId);
+  if (error) throw new Error(error.message);
+}
+
+/* Escala das perguntas de NOTA (estrela vs carinha) — troca TODAS de uma vez,
+   em vez de pergunta por pergunta (o que permitia montar um totem com estrela
+   e carinha misturadas). NPS e comentário não são afetados. Não muda schema:
+   o "modo" é derivado do próprio tipo das perguntas de nota, e trocar é um
+   UPDATE em massa. Respostas já gravadas mantêm o tipo que tinham na hora
+   (estrela e carinha valem 1–5 igual, então o histórico continua válido). */
+export async function definirEscala(modeloId, escala) {
+  const { error } = await supabase.from('pergunta')
+    .update({ tipo: escala }).eq('modelo_id', modeloId).in('tipo', ['estrela', 'carinha']);
   if (error) throw new Error(error.message);
 }
 

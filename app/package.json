@@ -1,7 +1,7 @@
 {
   "name": "isv-app",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Pesquisa de Satisfação ISV — coleta (totem) + painel de gestão, unificados, sobre Supabase",
   "scripts": {

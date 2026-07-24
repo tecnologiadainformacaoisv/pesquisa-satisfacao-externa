@@ -209,6 +209,15 @@ h1,h2{ font-family:var(--font-dp); letter-spacing:-.015em; margin:0; }
 .v-painel .gerenciar-bloco{ background:var(--paper); border:1px solid var(--line); border-radius:var(--r);
   padding:16px; display:flex; flex-direction:column; gap:10px; }
 .v-painel .gerenciar-bloco h3{ font-size:.92rem; font-family:var(--font); font-weight:700; margin:0; }
+/* seletor de escala das perguntas de nota (estrela vs carinha) */
+.v-painel .seletor-escala{ display:flex; flex-direction:column; gap:6px; padding:10px 0; }
+.v-painel .botoes-escala{ display:flex; gap:8px; }
+.v-painel .btn-escala{ flex:1; background:var(--surface); border:1.5px solid var(--line-2); color:var(--ink-2);
+  border-radius:9px; padding:9px 12px; font-size:.86rem; font-weight:650; cursor:pointer;
+  transition:border-color .12s, background .12s, color .12s; }
+.v-painel .btn-escala:hover{ border-color:var(--accent); }
+.v-painel .btn-escala.sel{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.v-painel .sub-escala{ font-size:.72rem; }
 .v-painel .lista-simples{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;
   font-size:.85rem; }
 .v-painel ol.lista-simples{ list-style:decimal; padding-left:18px; }

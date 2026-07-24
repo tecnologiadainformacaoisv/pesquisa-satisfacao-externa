@@ -5,16 +5,27 @@ import {
   carregarDetalhesInstituto, criarMunicipio, atualizarMunicipio, excluirMunicipio,
   criarUnidade, atualizarUnidade, excluirUnidade,
   criarModeloPesquisa, criarPergunta, atualizarPergunta, excluirPergunta, reordenarPerguntas,
-  atualizarColetaDemografia, uploadLogo,
+  atualizarColetaDemografia, uploadLogo, definirEscala,
 } from './lib/operador';
 import { iniciais } from './lib/marca';
 
-const TIPOS_PERGUNTA = [
+/* Ao criar/editar pergunta, estrela e carinha viram UMA opção só ("Nota") —
+   qual das duas aparece no totem é decidido pelo seletor de escala do
+   questionário (definirEscala), não pergunta por pergunta. Isso impede montar
+   um formulário com estrela e carinha misturadas. */
+const TIPOS_CRIACAO = [
   { v: 'nps', label: 'NPS (nota 0–10)' },
-  { v: 'estrela', label: 'Estrelas (1–5)' },
-  { v: 'carinha', label: 'Carinhas (1–5)' },
+  { v: 'nota', label: 'Nota (estrela ou carinha)' },
   { v: 'texto', label: 'Comentário livre' },
 ];
+const rotuloTipo = (tipo) =>
+  tipo === 'nps' ? 'NPS (nota 0–10)'
+  : tipo === 'texto' ? 'Comentário livre'
+  : 'Nota (estrela/carinha)';
+// tipo salvo no banco ('estrela'/'carinha') -> opção do dropdown ('nota')
+const tipoParaSelect = (tipo) => (tipo === 'estrela' || tipo === 'carinha' ? 'nota' : tipo);
+// opção do dropdown -> tipo salvo (resolve 'nota' pra escala atual do modelo)
+const resolverTipo = (tipoSelect, escala) => (tipoSelect === 'nota' ? escala : tipoSelect);
 
 /* Visão do dono do SaaS (papel='admin', cross-instituto) — não é a visão de
    nenhum instituto específico, é "quantas empresas estamos atendendo e como
@@ -526,6 +537,17 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
     catch (err) { setErro(err.message || String(err)); }
   }
 
+  // "modo de escala" das perguntas de nota, derivado das próprias perguntas:
+  // se houver ao menos uma carinha, o modo é carinha; senão, estrela.
+  const perguntasNota = perguntas.filter((p) => p.tipo === 'estrela' || p.tipo === 'carinha');
+  const escalaAtual = perguntasNota.some((p) => p.tipo === 'carinha') ? 'carinha' : 'estrela';
+
+  async function mudarEscala(escala) {
+    if (!modelo || escala === escalaAtual) return;
+    try { await definirEscala(modelo.id, escala); await onMudou(); }
+    catch (err) { setErro(err.message || String(err)); }
+  }
+
   if (!modelo) {
     return (
       <div className="gerenciar-bloco">
@@ -542,6 +564,20 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
   return (
     <div className="gerenciar-bloco">
       <h3>Questionário — {modelo.nome}</h3>
+      {perguntasNota.length > 0 && (
+        <div className="seletor-escala">
+          <span className="sub">Escala das perguntas de nota:</span>
+          <div className="botoes-escala">
+            <button type="button"
+              className={'btn-escala' + (escalaAtual === 'estrela' ? ' sel' : '')}
+              onClick={() => mudarEscala('estrela')}>★ Estrelas</button>
+            <button type="button"
+              className={'btn-escala' + (escalaAtual === 'carinha' ? ' sel' : '')}
+              onClick={() => mudarEscala('carinha')}>☺ Carinhas</button>
+          </div>
+          <span className="sub sub-escala">Vale pra todas as perguntas de nota deste questionário — nunca mistura estrela e carinha no mesmo totem.</span>
+        </div>
+      )}
       <label className="form-checkbox">
         <input type="checkbox" checked={!!modelo.coleta_demografia} onChange={alternarDemografia} />
         Perguntar faixa etária ao coletar (opcional, pulável)
@@ -552,7 +588,7 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
           <ol className="lista-simples lista-arrastavel">
             {perguntas.map((p, i) => editandoId === p.id ? (
               <li key={p.id}>
-                <ItemEditorPergunta pergunta={p} onSalvo={() => { setEditandoId(null); onMudou(); }} onCancelar={() => setEditandoId(null)} />
+                <ItemEditorPergunta pergunta={p} escalaAtual={escalaAtual} onSalvo={() => { setEditandoId(null); onMudou(); }} onCancelar={() => setEditandoId(null)} />
               </li>
             ) : (
               <li key={p.id}
@@ -564,7 +600,7 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
                   onDragEnd={() => { setArrastandoIdx(null); setSobreIdx(null); }}
                   onDrop={(e) => { e.preventDefault(); soltarEm(i); }}>
                 <span className="alca-arrastar" title="Arrastar pra reordenar">⠿⠿</span>
-                <span className="item-texto">{p.texto} <span className="sub">({TIPOS_PERGUNTA.find((t) => t.v === p.tipo)?.label})</span></span>
+                <span className="item-texto">{p.texto} <span className="sub">({rotuloTipo(p.tipo)})</span></span>
                 <span className="acoes-item">
                   <button type="button" className="link" onClick={() => setEditandoId(p.id)}>editar</button>
                   <button type="button" className="link link-perigo" onClick={() => excluir(p)}>excluir</button>
@@ -574,14 +610,14 @@ function BlocoQuestionario({ institutoId, modelos, perguntas, onMudou }) {
           </ol>
         </>
       )}
-      <FormNovaPergunta institutoId={institutoId} modeloId={modelo.id} proximaOrdem={perguntas.length + 1} onMudou={onMudou} />
+      <FormNovaPergunta institutoId={institutoId} modeloId={modelo.id} proximaOrdem={perguntas.length + 1} escalaAtual={escalaAtual} onMudou={onMudou} />
     </div>
   );
 }
 
-function ItemEditorPergunta({ pergunta, onSalvo, onCancelar }) {
+function ItemEditorPergunta({ pergunta, escalaAtual, onSalvo, onCancelar }) {
   const [texto, setTexto] = useState(pergunta.texto);
-  const [tipo, setTipo] = useState(pergunta.tipo);
+  const [tipo, setTipo] = useState(tipoParaSelect(pergunta.tipo));
   const [obrigatoria, setObrigatoria] = useState(pergunta.obrigatoria);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
@@ -590,7 +626,8 @@ function ItemEditorPergunta({ pergunta, onSalvo, onCancelar }) {
     e.preventDefault();
     setEnviando(true); setErro('');
     try {
-      await atualizarPergunta(pergunta.id, { texto: texto.trim(), tipo, obrigatoria: tipo === 'texto' ? false : obrigatoria });
+      const tipoReal = resolverTipo(tipo, escalaAtual);
+      await atualizarPergunta(pergunta.id, { texto: texto.trim(), tipo: tipoReal, obrigatoria: tipo === 'texto' ? false : obrigatoria });
       onSalvo();
     } catch (err) { setErro(err.message || String(err)); setEnviando(false); }
   }
@@ -599,7 +636,7 @@ function ItemEditorPergunta({ pergunta, onSalvo, onCancelar }) {
     <form className="form-linha form-linha-compacta form-linha-edicao" onSubmit={salvar}>
       <input value={texto} onChange={(e) => setTexto(e.target.value)} required />
       <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-        {TIPOS_PERGUNTA.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
+        {TIPOS_CRIACAO.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
       </select>
       {tipo !== 'texto' && (
         <label className="form-checkbox">
@@ -614,9 +651,9 @@ function ItemEditorPergunta({ pergunta, onSalvo, onCancelar }) {
   );
 }
 
-function FormNovaPergunta({ institutoId, modeloId, proximaOrdem, onMudou }) {
+function FormNovaPergunta({ institutoId, modeloId, proximaOrdem, escalaAtual, onMudou }) {
   const [texto, setTexto] = useState('');
-  const [tipo, setTipo] = useState('estrela');
+  const [tipo, setTipo] = useState('nota');
   const [obrigatoria, setObrigatoria] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState('');
@@ -627,7 +664,7 @@ function FormNovaPergunta({ institutoId, modeloId, proximaOrdem, onMudou }) {
     try {
       await criarPergunta({
         instituto_id: institutoId, modelo_id: modeloId, ordem: proximaOrdem,
-        tipo, texto: texto.trim(), obrigatoria: tipo === 'texto' ? false : obrigatoria,
+        tipo: resolverTipo(tipo, escalaAtual), texto: texto.trim(), obrigatoria: tipo === 'texto' ? false : obrigatoria,
       });
       setTexto('');
       await onMudou();
@@ -644,7 +681,7 @@ function FormNovaPergunta({ institutoId, modeloId, proximaOrdem, onMudou }) {
       <label>
         Tipo
         <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-          {TIPOS_PERGUNTA.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
+          {TIPOS_CRIACAO.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
         </select>
       </label>
       {tipo !== 'texto' && (
