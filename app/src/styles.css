@@ -2,8 +2,10 @@
    (gestão), unificados num só app. Ver App.jsx para como o portão decide
    pra onde mandar. */
 :root{
+  color-scheme: light;   /* app inteiro fixo no claro, mesmo com o SO em tema escuro
+                            — força controles nativos (select/input/scrollbar) claros */
   --ink:#16262B; --ink-2:#45595F; --muted:#77898F;
-  --paper:#F1F4F2; --surface:#FFFFFF; --sunken:#EEF2F0;
+  --paper:#FFFFFF; --surface:#FFFFFF; --sunken:#F1F4F2;
   --line:#E1E7E5; --line-2:#C3D0CC;
   --accent:#0B6E63; --accent-d:#095e54;
   --bad:#A63A30; --warn:#DE8038; --good:#0C6036;
@@ -12,22 +14,11 @@
   --r:12px;
   --shadow:0 1px 2px rgba(22,38,43,.05), 0 8px 24px -14px rgba(22,38,43,.2);
 }
-/* O painel de gestão respeita tema escuro do sistema. A coleta (totem) e o
-   portão ficam sempre no tema claro — é aparelho físico dedicado, não deve
-   trocar de cara sozinho. */
-@media (prefers-color-scheme: dark){
-  .v-painel{
-    --ink:#E4EDEA; --ink-2:#A8BBB7; --muted:#7C918E;
-    --paper:#0E1719; --surface:#162326; --sunken:#1D2C2F;
-    --line:#2A3B3E; --line-2:#384C50; --accent:#4FBFAE; --accent-d:#6FD3C2;
-    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -14px rgba(0,0,0,.6);
-  }
-}
-/* .v-painel é descendente de <body> (nunca ancestral) — as variáveis de tema
-   escuro acima só existem dentro dele. `color`/`background` do <body> foram
-   resolvidos LÁ FORA desse escopo (sempre modo claro) e simplesmente
-   herdavam pra dentro, deixando texto escuro sobre cartão escuro. Reafirmar
-   os dois aqui faz tudo dentro do painel resolver as variáveis certas. */
+/* Tema claro fixo no app inteiro (portão, coleta E painel). O painel já
+   respeitou o tema escuro do SO no passado, mas foi fixado no claro pra
+   casar com o fundo branco e não trocar de cara sozinho conforme o
+   aparelho/SO do usuário. Reafirmar background/color no wrapper garante
+   que tudo dentro do painel resolva as variáveis do tema claro. */
 .v-painel{ min-height:100%; background:var(--paper); color:var(--ink); }
 
 *{ box-sizing:border-box; }
